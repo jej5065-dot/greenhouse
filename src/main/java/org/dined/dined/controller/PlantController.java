@@ -39,8 +39,27 @@ public class PlantController {
 
     @PutMapping("/{id}")
     public Plant updatePlant(@PathVariable Long id, @RequestBody Plant plant) {
-        plant.setId(id);
-        return plantService.savePlant(plant);
+        Plant existing = plantService.getPlantById(id);
+        
+        // Update basic fields
+        existing.setName(plant.getName());
+        existing.setType(plant.getType());
+        existing.setLocation(plant.getLocation());
+        existing.setStatus(plant.getStatus());
+        existing.setGoodForTerrariums(plant.isGoodForTerrariums());
+        existing.setWateringFrequencyDays(plant.getWateringFrequencyDays());
+        
+        // Update care info
+        existing.setCareInstructions(plant.getCareInstructions());
+        existing.setPropagationInstructions(plant.getPropagationInstructions());
+        existing.setTotalPropagationTime(plant.getTotalPropagationTime());
+        
+        // Update financials
+        existing.setOriginalPurchasePrice(plant.getOriginalPurchasePrice());
+        existing.setPrice(plant.getPrice());
+        existing.setSoldDate(plant.getSoldDate());
+
+        return plantService.savePlant(existing);
     }
 
     @DeleteMapping("/{id}")
@@ -57,6 +76,12 @@ public class PlantController {
     @PostMapping("/{id}/propagate")
     public Plant propagatePlant(@PathVariable Long id) {
         return plantService.propagatePlant(id);
+    }
+
+    @PostMapping("/{id}/upload")
+    public ResponseEntity<Plant> uploadImageForPlant(@PathVariable Long id, @RequestParam("file") MultipartFile file) throws IOException {
+        Plant updatedPlant = plantService.updatePlantImage(id, file);
+        return ResponseEntity.ok(updatedPlant);
     }
 
     @PostMapping("/upload")

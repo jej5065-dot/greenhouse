@@ -4,7 +4,7 @@ import {
   IconButton, Button, TextField, Box, Chip, AppBar, Toolbar, 
   Fab, Dialog, DialogTitle, DialogContent, DialogActions,
   Autocomplete, Checkbox, FormControlLabel, Divider, Menu, MenuItem,
-  Tooltip, Tab, Tabs
+  Tooltip, Tab, Tabs, InputAdornment
 } from '@mui/material'
 import { 
   Droplet, Scissors, Search, Plus, Calendar, MapPin, 
@@ -13,6 +13,8 @@ import {
   ExternalLink
 } from 'lucide-react'
 import axios from 'axios'
+import SimpleMDE from 'react-simplemde-editor'
+import 'easymde/dist/easymde.min.css'
 
 interface Plant {
   id: number;
@@ -56,7 +58,9 @@ function App() {
   // Modals
   const [openAdd, setOpenAdd] = useState(false);
   const [selectedPlant, setSelectedPlant] = useState<Plant | null>(null);
+  const [fullImage, setFullImage] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState(0);
+  const [editMode, setEditMode] = useState(false);
 
   const [newPlant, setNewPlant] = useState<Partial<Plant>>({ 
     name: '', type: '', wateringFrequencyDays: 7, location: '',
@@ -130,10 +134,20 @@ function App() {
 
   const handleUpdatePlant = async () => {
     if (!selectedPlant) return;
-    await axios.put(`/api/plants/${selectedPlant.id}`, selectedPlant);
-    fetchPlants(searchTerm);
-    fetchSummary();
-    setOpenAdd(false);
+    try {
+      // Create a shallow copy and remove relationships that can cause circular JSON errors
+      const plantToUpdate = { ...selectedPlant };
+      delete (plantToUpdate as any).parent;
+      delete (plantToUpdate as any).children;
+
+      await axios.put(`/api/plants/${selectedPlant.id}`, plantToUpdate);
+      await fetchPlants(searchTerm);
+      await fetchSummary();
+      setSelectedPlant(null);
+    } catch (error) {
+      console.error('Update failed:', error);
+      alert('Failed to save changes. Check console for details.');
+    }
   };
 
   const handleViewDetails = async (id: number) => {
@@ -150,21 +164,26 @@ function App() {
     formData.append('file', file);
 
     try {
-      const res = await axios.post('/api/plants/upload', formData);
-      const filename = res.data;
-      
-      const plantRes = await axios.get(`/api/plants/${uploadingPlantId}`);
-      const plant = plantRes.data;
-      await axios.put(`/api/plants/${uploadingPlantId}`, { ...plant, imagePath: filename });
+      await axios.post(`/api/plants/${uploadingPlantId}/upload`, formData);
       fetchPlants(searchTerm);
       fetchSummary();
       if (selectedPlant?.id === uploadingPlantId) handleViewDetails(uploadingPlantId);
-    } catch (error) { console.error('Upload failed', error); } finally { setUploadingPlantId(null); }
+    } catch (error) { 
+      console.error('Upload failed', error);
+      alert('Upload failed. Check console for details.');
+    } finally { 
+      setUploadingPlantId(null); 
+    }
   };
 
   const triggerUpload = (id: number) => {
     setUploadingPlantId(id);
     fileInputRef.current?.click();
+  };
+
+  const formatCurrency = (val?: number) => {
+    if (val === undefined || val === null) return '';
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
   };
 
   return (
@@ -177,12 +196,19 @@ function App() {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
             Greenhouse
           </Typography>
-          <Box component="form" onSubmit={(e) => {e.preventDefault(); fetchPlants(searchTerm)}} sx={{ display: 'flex', alignItems: 'center', bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 2, px: 1 }}>
-            <Search size={18} />
+          <Box component="form" onSubmit={(e) => {e.preventDefault(); fetchPlants(searchTerm)}} sx={{ display: 'flex', alignItems: 'center', bgcolor: 'rgba(255,255,255,0.2)', borderRadius: 2, px: 1.5 }}>
+            <Search size={18} color="white" />
             <TextField 
               placeholder="Search..." variant="standard" size="small" value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              sx={{ ml: 1, color: 'white', width: { xs: 100, sm: 200 }, '& .MuiInput-underline:before': { borderBottom: 'none' } }}
+              sx={{ 
+                ml: 1, 
+                width: { xs: 100, sm: 200 }, 
+                '& .MuiInputBase-input': { color: 'white', py: 0.5 },
+                '& .MuiInput-underline:before': { borderBottom: 'none' },
+                '& .MuiInput-underline:after': { borderBottom: 'none' },
+                '& .MuiInput-underline:hover:not(.Mui-disabled):before': { borderBottom: 'none' }
+              }}
             />
           </Box>
         </Toolbar>
@@ -199,7 +225,7 @@ function App() {
             </Grid>
             <Grid item xs={6} sm={3}>
               <Card elevation={1} sx={{ p: 2, textAlign: 'center' }}>
-                <Typography variant="h5" color="error" sx={{ fontWeight: 'bold' }}>{summary.needsAttention}</Typography>
+                <Typography variant="h5" color="warning.main" sx={{ fontWeight: 'bold' }}>{summary.needsAttention}</Typography>
                 <Typography variant="caption" color="textSecondary">Needs Attention</Typography>
               </Card>
             </Grid>
@@ -219,7 +245,7 @@ function App() {
         )}
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button variant="contained" size="small" startIcon={<AlertCircle />} onClick={() => fetchPlants('Needs Attention')} color="error">Needs Attention</Button>
+            <Button variant="contained" size="small" startIcon={<AlertCircle />} onClick={() => fetchPlants('Needs Attention')} color="warning">Needs Attention</Button>
             <Button variant="outlined" size="small" startIcon={<Droplet />} onClick={() => fetchPlants('Watering soon')}>Due</Button>
             <Button variant="text" size="small" onClick={() => fetchPlants('')}>All</Button>
           </Box>
@@ -239,11 +265,25 @@ function App() {
           {plants.map((plant) => (
             <Grid item xs={12} sm={6} md={4} key={plant.id}>
               <Card sx={{ height: '100%', borderRadius: 3, transition: '0.2s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 } }}>
-                <Box sx={{ height: 180, bgcolor: '#e0e0e0', position: 'relative', overflow: 'hidden' }} onClick={() => handleViewDetails(plant.id)}>
+                <Box sx={{ height: 180, bgcolor: '#e0e0e0', position: 'relative', overflow: 'hidden' }}>
                   {plant.imagePath ? (
-                    <img src={`/uploads/${plant.imagePath}`} alt={plant.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
+                      <img 
+                        src={`/uploads/thumb_${plant.imagePath}?t=${new Date().getTime()}`} 
+                        alt={plant.name} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} 
+                        onClick={() => setFullImage(plant.imagePath)}
+                      />
+                      <IconButton 
+                        size="small" 
+                        sx={{ position: 'absolute', bottom: 8, right: 8, bgcolor: 'rgba(255,255,255,0.7)', '&:hover': { bgcolor: 'white' } }}
+                        onClick={() => setFullImage(plant.imagePath)}
+                      >
+                        <Search size={14} />
+                      </IconButton>
+                    </Box>
                   ) : (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', cursor: 'pointer' }} onClick={() => handleViewDetails(plant.id)}>
                       <ImageIcon size={40} color="#999" />
                       <Typography variant="caption" color="textSecondary">No Photo</Typography>
                     </Box>
@@ -251,6 +291,10 @@ function App() {
                   {plant.goodForTerrariums && (
                     <Chip label="Terrarium" size="small" color="secondary" sx={{ position: 'absolute', top: 8, right: 8, height: 20, fontSize: '0.65rem' }} />
                   )}
+                  <Box 
+                    sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, cursor: 'pointer' }} 
+                    onClick={(e) => { if (e.target === e.currentTarget) handleViewDetails(plant.id); }}
+                  />
                 </Box>
                 <CardContent sx={{ pb: 1 }} onClick={() => handleViewDetails(plant.id)} style={{ cursor: 'pointer' }}>
                   <Typography variant="caption" color="textSecondary" sx={{ fontWeight: 500 }}>
@@ -264,8 +308,8 @@ function App() {
                     <Typography variant="body2" color="textSecondary">{plant.location || 'Unknown'}</Typography>
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Droplet size={14} color={plant.status === 'Needs Attention' ? '#d32f2f' : '#2e7d32'} />
-                    <Typography variant="body2" sx={{ fontWeight: 500, color: plant.status === 'Needs Attention' ? 'error.main' : 'text.primary' }}>
+                    <Droplet size={14} color={plant.status === 'Needs Attention' ? '#ed6c02' : '#2e7d32'} />
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: plant.status === 'Needs Attention' ? 'warning.main' : 'text.primary' }}>
                       Next: {plant.nextWaterDate ? new Date(plant.nextWaterDate).toLocaleDateString() : 'TBD'}
                     </Typography>
                   </Box>
@@ -294,65 +338,150 @@ function App() {
               </Box>
               <IconButton color="error" onClick={() => handleDelete(selectedPlant.id)}><Trash2 size={20} /></IconButton>
             </DialogTitle>
-            <DialogContent>
-              <Tabs value={detailTab} onChange={(_, v) => setDetailTab(v)} sx={{ mb: 2 }}>
+            <DialogContent sx={{ minHeight: 500 }}>
+              <Tabs value={detailTab} onChange={(_, v) => { setDetailTab(v); setEditMode(false); }} sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }} variant="scrollable" scrollButtons="auto">
                 <Tab label="Info" icon={<Info size={16} />} iconPosition="start" />
                 <Tab label="Care" icon={<Settings size={16} />} iconPosition="start" />
+                <Tab label="Propagation" icon={<Scissors size={16} />} iconPosition="start" />
                 <Tab label="Lineage" icon={<Sprout size={16} />} iconPosition="start" />
                 <Tab label="Finance" icon={<DollarSign size={16} />} iconPosition="start" />
               </Tabs>
 
               {detailTab === 0 && (
-                <Grid container spacing={2} sx={{ mt: 1 }}>
+                <Grid container spacing={3}>
                   <Grid item xs={12}>
-                    <Box sx={{ height: 150, bgcolor: '#eee', borderRadius: 2, overflow: 'hidden', mb: 2, cursor: 'pointer' }} onClick={() => triggerUpload(selectedPlant.id)}>
-                      {selectedPlant.imagePath ? <img src={`/uploads/${selectedPlant.imagePath}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}><Camera size={32} /></Box>}
+                    <Box sx={{ height: 200, bgcolor: '#f5f5f5', borderRadius: 3, overflow: 'hidden', position: 'relative', border: '2px dashed #e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {selectedPlant.imagePath ? (
+                        <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
+                          <img 
+                            src={`/uploads/thumb_${selectedPlant.imagePath}?t=${new Date().getTime()}`} 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} 
+                            onClick={() => setFullImage(selectedPlant.imagePath)}
+                          />
+                          <Box sx={{ position: 'absolute', bottom: 8, right: 8, display: 'flex', gap: 1 }}>
+                            <Button size="small" variant="contained" startIcon={<Camera size={14} />} onClick={() => triggerUpload(selectedPlant.id)} sx={{ fontSize: '0.7rem' }}>Change</Button>
+                            <IconButton size="small" sx={{ bgcolor: 'white', '&:hover': { bgcolor: '#eee' } }} onClick={() => setFullImage(selectedPlant.imagePath)}><Search size={14} /></IconButton>
+                          </Box>
+                        </Box>
+                      ) : (
+                        <Box sx={{ textAlign: 'center', color: 'text.secondary', cursor: 'pointer' }} onClick={() => triggerUpload(selectedPlant.id)}>
+                          <Camera size={32} />
+                          <Typography variant="caption" display="block">Click to add photo</Typography>
+                        </Box>
+                      )}
                     </Box>
                   </Grid>
-                  <Grid item xs={6}><TextField fullWidth label="Name" value={selectedPlant.name} onChange={(e) => setSelectedPlant({...selectedPlant, name: e.target.value})} size="small" /></Grid>
-                  <Grid item xs={6}><TextField fullWidth label="Type" value={selectedPlant.type} onChange={(e) => setSelectedPlant({...selectedPlant, type: e.target.value})} size="small" /></Grid>
-                  <Grid item xs={12}>
+                  <Grid item xs={12} sm={6}><TextField fullWidth label="Name" value={selectedPlant.name} onChange={(e) => setSelectedPlant({...selectedPlant, name: e.target.value})} size="small" /></Grid>
+                  <Grid item xs={12} sm={6}><TextField fullWidth label="Type" value={selectedPlant.type} onChange={(e) => setSelectedPlant({...selectedPlant, type: e.target.value})} size="small" /></Grid>
+                  <Grid item xs={12} sm={6}>
                     <Autocomplete freeSolo options={locations} value={selectedPlant.location} onInputChange={(_, n) => setSelectedPlant({...selectedPlant, location: n})} renderInput={(p) => <TextField {...p} label="Location" size="small" />} />
                   </Grid>
-                  <Grid item xs={6}>
+                  <Grid item xs={12} sm={6}>
                     <Autocomplete options={['Active', 'Propagating', 'Needs Attention', 'Ready to Sell', 'Sold']} value={selectedPlant.status} onChange={(_, n) => setSelectedPlant({...selectedPlant, status: n || ''})} renderInput={(p) => <TextField {...p} label="Status" size="small" />} />
                   </Grid>
-                  <Grid item xs={6}><FormControlLabel control={<Checkbox checked={selectedPlant.goodForTerrariums} onChange={(e) => setSelectedPlant({...selectedPlant, goodForTerrariums: e.target.checked})} />} label="Terrarium Ready" /></Grid>
+                  <Grid item xs={12}><FormControlLabel control={<Checkbox checked={selectedPlant.goodForTerrariums} onChange={(e) => setSelectedPlant({...selectedPlant, goodForTerrariums: e.target.checked})} />} label="Good for Terrariums" /></Grid>
+                  <Grid item xs={12}><TextField fullWidth label="Watering Frequency (Days)" type="number" value={selectedPlant.wateringFrequencyDays} onKeyDown={(e) => {if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) e.preventDefault();}} onChange={(e) => setSelectedPlant({...selectedPlant, wateringFrequencyDays: parseInt(e.target.value) || 0})} size="small" /></Grid>
                 </Grid>
               )}
 
               {detailTab === 1 && (
-                <Grid container spacing={2} sx={{ mt: 1 }}>
-                  <Grid item xs={12}><TextField fullWidth multiline rows={3} label="Care Instructions" value={selectedPlant.careInstructions || ''} onChange={(e) => setSelectedPlant({...selectedPlant, careInstructions: e.target.value})} /></Grid>
-                  <Grid item xs={12}><TextField fullWidth multiline rows={3} label="Propagation Notes" value={selectedPlant.propagationInstructions || ''} onChange={(e) => setSelectedPlant({...selectedPlant, propagationInstructions: e.target.value})} /></Grid>
-                  <Grid item xs={12}><TextField fullWidth label="Watering Frequency (Days)" type="number" value={selectedPlant.wateringFrequencyDays} onChange={(e) => setSelectedPlant({...selectedPlant, wateringFrequencyDays: parseInt(e.target.value)})} size="small" /></Grid>
-                </Grid>
+                <Box sx={{ '& .editor-toolbar': { borderRadius: '8px 8px 0 0' }, '& .CodeMirror': { borderRadius: '0 0 8px 8px', minHeight: 300 } }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>Care Instructions (Markdown)</Typography>
+                  <SimpleMDE 
+                    value={selectedPlant.careInstructions || ''} 
+                    onChange={(val) => setSelectedPlant({...selectedPlant, careInstructions: val})}
+                    options={{
+                      spellChecker: false,
+                      toolbar: ['bold', 'italic', 'heading', '|', 'quote', 'unordered-list', 'ordered-list', '|', 'preview', 'side-by-side', 'fullscreen'],
+                      status: false
+                    }}
+                  />
+                </Box>
               )}
 
               {detailTab === 2 && (
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom>Parent Plant</Typography>
-                  {selectedPlant.parent ? (
-                    <Chip icon={<ExternalLink size={14} />} label={selectedPlant.parent.name} onClick={() => handleViewDetails(selectedPlant.parent!.id)} sx={{ mb: 2 }} />
-                  ) : <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>None (Original Plant)</Typography>}
-                  
-                  <Divider sx={{ my: 2 }} />
-                  <Typography variant="subtitle2" gutterBottom>Children / Cuttings</Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                    {selectedPlant.children?.map(child => (
-                      <Chip key={child.id} label={child.name} onClick={() => handleViewDetails(child.id)} variant="outlined" size="small" />
-                    ))}
-                    {(!selectedPlant.children || selectedPlant.children.length === 0) && <Typography variant="body2" color="textSecondary">No cuttings taken yet.</Typography>}
+                <Box>
+                  <Box sx={{ '& .editor-toolbar': { borderRadius: '8px 8px 0 0' }, '& .CodeMirror': { borderRadius: '0 0 8px 8px', minHeight: 300 }, mb: 3 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>Propagation Notes (Markdown)</Typography>
+                    <SimpleMDE 
+                      value={selectedPlant.propagationInstructions || ''} 
+                      onChange={(val) => setSelectedPlant({...selectedPlant, propagationInstructions: val})}
+                      options={{
+                        spellChecker: false,
+                        toolbar: ['bold', 'italic', 'heading', '|', 'quote', 'unordered-list', 'ordered-list', '|', 'preview', 'side-by-side', 'fullscreen'],
+                        status: false
+                      }}
+                    />
                   </Box>
-                  <TextField fullWidth sx={{ mt: 3 }} label="Total Propagation Time" value={selectedPlant.totalPropagationTime || ''} onChange={(e) => setSelectedPlant({...selectedPlant, totalPropagationTime: e.target.value})} size="small" />
+                  <TextField fullWidth label="Total Propagation Time" value={selectedPlant.totalPropagationTime || ''} onChange={(e) => setSelectedPlant({...selectedPlant, totalPropagationTime: e.target.value})} size="small" placeholder="e.g. 4 weeks to root" />
                 </Box>
               )}
 
               {detailTab === 3 && (
-                <Grid container spacing={2} sx={{ mt: 1 }}>
-                  <Grid item xs={6}><TextField fullWidth label="Original Cost ($)" type="number" value={selectedPlant.originalPurchasePrice || ''} onChange={(e) => setSelectedPlant({...selectedPlant, originalPurchasePrice: parseFloat(e.target.value)})} size="small" /></Grid>
-                  <Grid item xs={6}><TextField fullWidth label="Current Price ($)" type="number" value={selectedPlant.price || ''} onChange={(e) => setSelectedPlant({...selectedPlant, price: parseFloat(e.target.value)})} size="small" /></Grid>
-                  <Grid item xs={12}><TextField fullWidth label="Sold Date" type="date" InputLabelProps={{ shrink: true }} value={selectedPlant.soldDate || ''} onChange={(e) => setSelectedPlant({...selectedPlant, soldDate: e.target.value})} size="small" /></Grid>
+                <Box sx={{ py: 1 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>Parent Source</Typography>
+                  {selectedPlant.parent ? (
+                    <Chip 
+                      icon={<ExternalLink size={14} />} 
+                      label={`${selectedPlant.parent.name} (#${selectedPlant.parent.id})`} 
+                      onClick={() => handleViewDetails(selectedPlant.parent!.id)} 
+                      color="primary" variant="outlined" sx={{ mb: 3 }} 
+                    />
+                  ) : <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>This is an original plant (no recorded parent).</Typography>}
+                  
+                  <Divider sx={{ mb: 3 }} />
+                  
+                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>Children (Cuttings)</Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
+                    {selectedPlant.children?.map(child => (
+                      <Chip key={child.id} label={child.name} onClick={() => handleViewDetails(child.id)} variant="outlined" clickable />
+                    ))}
+                    {(!selectedPlant.children || selectedPlant.children.length === 0) && <Typography variant="body2" color="textSecondary">No cuttings have been taken from this plant.</Typography>}
+                  </Box>
+                </Box>
+              )}
+
+              {detailTab === 4 && (
+                <Grid container spacing={3}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField 
+                      fullWidth label="Purchase Price"
+                      type="number"
+                      InputProps={{
+                        startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                        inputProps: { step: "0.01" }
+                      }}
+                      value={selectedPlant.originalPurchasePrice !== undefined ? selectedPlant.originalPurchasePrice : ''} 
+                      onKeyDown={(e) => {
+                        const allowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', '.', 'Enter'];
+                        if (!allowed.includes(e.key) && !/[0-9]/.test(e.key)) {
+                          e.preventDefault();
+                        }
+                      }}
+                      onChange={(e) => setSelectedPlant({...selectedPlant, originalPurchasePrice: e.target.value === '' ? undefined : parseFloat(e.target.value)})} 
+                      size="small" 
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField 
+                      fullWidth label="Listing Price"
+                      type="number"
+                      InputProps={{
+                        startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                        inputProps: { step: "0.01" }
+                      }}
+                      value={selectedPlant.price !== undefined ? selectedPlant.price : ''} 
+                      onKeyDown={(e) => {
+                        const allowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', '.', 'Enter'];
+                        if (!allowed.includes(e.key) && !/[0-9]/.test(e.key)) {
+                          e.preventDefault();
+                        }
+                      }}
+                      onChange={(e) => setSelectedPlant({...selectedPlant, price: e.target.value === '' ? undefined : parseFloat(e.target.value)})} 
+                      size="small" 
+                    />
+                  </Grid>
+                  <Grid item xs={12}><TextField fullWidth label="Date Sold" type="date" InputLabelProps={{ shrink: true }} value={selectedPlant.soldDate || ''} onChange={(e) => setSelectedPlant({...selectedPlant, soldDate: e.target.value})} size="small" /></Grid>
                 </Grid>
               )}
             </DialogContent>
@@ -378,6 +507,25 @@ function App() {
           <Button onClick={() => setOpenAdd(false)}>Cancel</Button>
           <Button onClick={handleAddPlant} variant="contained">Add</Button>
         </DialogActions>
+      </Dialog>
+
+      {/* Lightbox for Original Images */}
+      <Dialog open={Boolean(fullImage)} onClose={() => setFullImage(null)} maxWidth="lg" fullWidth>
+        <Box sx={{ position: 'relative', bgcolor: 'black', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh' }}>
+          <IconButton 
+            onClick={() => setFullImage(null)} 
+            sx={{ position: 'absolute', top: 8, right: 8, color: 'white', bgcolor: 'rgba(0,0,0,0.5)', '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' } }}
+          >
+            <Plus style={{ transform: 'rotate(45deg)' }} />
+          </IconButton>
+          {fullImage && (
+            <img 
+              src={`/uploads/original_${fullImage}`} 
+              alt="Full view" 
+              style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain' }} 
+            />
+          )}
+        </Box>
       </Dialog>
     </Box>
   );

@@ -3,10 +3,15 @@ package org.dined.dined.service;
 import org.dined.dined.model.Plant;
 import org.dined.dined.model.PlantSummary;
 import org.dined.dined.repository.PlantRepository;
+import org.imgscalr.Scalr;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -72,17 +77,11 @@ public class PlantService {
         }
 
         try {
-            // Calculate SHA-256 Hash
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] buffer = new byte[8192];
-            int count;
-            try (InputStream is = file.getInputStream()) {
-                while ((count = is.read(buffer)) > 0) {
-                    digest.update(buffer, 0, count);
-                }
-            }
+            byte[] fileBytes = file.getBytes();
             
-            byte[] hash = digest.digest();
+            // Calculate SHA-256 Hash of original file for deduplication
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(fileBytes);
             StringBuilder hexString = new StringBuilder();
             for (byte b : hash) {
                 String hex = Integer.toHexString(0xff & b);
@@ -90,18 +89,29 @@ public class PlantService {
                 hexString.append(hex);
             }
 
-            String extension = "";
+            String extension = "jpg";
             String originalFilename = file.getOriginalFilename();
             if (originalFilename != null && originalFilename.contains(".")) {
-                extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+                extension = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
             }
             
-            String hashedFilename = hexString.toString() + extension.toLowerCase();
-            Path targetPath = this.root.resolve(hashedFilename);
+            String hashedFilename = hexString.toString() + "." + extension;
+            Path originalPath = this.root.resolve("original_" + hashedFilename);
+            Path thumbPath = this.root.resolve("thumb_" + hashedFilename);
 
-            // Only save if it doesn't already exist (deduplication)
-            if (!Files.exists(targetPath)) {
-                Files.copy(file.getInputStream(), targetPath);
+            if (!Files.exists(originalPath)) {
+                // Save original
+                Files.write(originalPath, fileBytes);
+
+                // Generate and save thumbnail
+                BufferedImage originalImage = ImageIO.read(new ByteArrayInputStream(fileBytes));
+                if (originalImage != null) {
+                    BufferedImage resizedImage = Scalr.resize(originalImage, Scalr.Method.QUALITY, Scalr.Mode.FIT_TO_WIDTH, 1024);
+                    ImageIO.write(resizedImage, extension, thumbPath.toFile());
+                } else {
+                    // Fallback
+                    Files.write(thumbPath, fileBytes);
+                }
             }
 
             return hashedFilename;
@@ -125,6 +135,13 @@ public class PlantService {
                 .sum();
 
         return new PlantSummary(totalPlants, needsAttention, propagating, readyToSell, distinctLocations, totalEstimatedValue);
+    }
+
+    public Plant updatePlantImage(Long id, MultipartFile file) throws IOException {
+        String filename = saveImage(file);
+        Plant plant = getPlantById(id);
+        plant.setImagePath(filename);
+        return plantRepository.save(plant);
     }
 
     public List<Plant> searchPlants(String term) {
