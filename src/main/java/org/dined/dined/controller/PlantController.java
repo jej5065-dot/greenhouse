@@ -1,6 +1,7 @@
 package org.dined.dined.controller;
 
 import org.dined.dined.model.Plant;
+import org.dined.dined.model.PlantSummary;
 import org.dined.dined.service.PlantService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -67,5 +68,10 @@ public class PlantController {
     @GetMapping("/locations")
     public List<String> getLocations() {
         return plantService.getLocations();
+    }
+
+    @GetMapping("/summary")
+    public PlantSummary getPlantSummary() {
+        return plantService.getPlantSummary();
     }
 }

@@ -1,6 +1,7 @@
 package org.dined.dined.service;
 
 import org.dined.dined.model.Plant;
+import org.dined.dined.model.PlantSummary;
 import org.dined.dined.repository.PlantRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -107,6 +108,23 @@ public class PlantService {
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("Could not calculate file hash", e);
         }
+    }
+
+    public PlantSummary getPlantSummary() {
+        List<Plant> allPlants = plantRepository.findAll();
+
+        long totalPlants = allPlants.size();
+        long needsAttention = allPlants.stream().filter(p -> "Needs Attention".equals(p.getStatus())).count();
+        long propagating = allPlants.stream().filter(p -> "Propagating".equals(p.getStatus())).count();
+        long readyToSell = allPlants.stream().filter(p -> "Ready to Sell".equals(p.getStatus())).count();
+        long distinctLocations = allPlants.stream().map(Plant::getLocation).filter(loc -> loc != null && !loc.trim().isEmpty()).distinct().count();
+        
+        double totalEstimatedValue = allPlants.stream()
+                .filter(p -> !"Sold".equals(p.getStatus()) && p.getPrice() != null)
+                .mapToDouble(Plant::getPrice)
+                .sum();
+
+        return new PlantSummary(totalPlants, needsAttention, propagating, readyToSell, distinctLocations, totalEstimatedValue);
     }
 
     public List<Plant> searchPlants(String term) {

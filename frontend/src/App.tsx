@@ -7,7 +7,7 @@ import {
   Tooltip, Tab, Tabs
 } from '@mui/material'
 import { 
-  Droplet, Scissor, Search, Plus, Calendar, MapPin, 
+  Droplet, Scissors, Search, Plus, Calendar, MapPin, 
   AlertCircle, ChevronRight, Image as ImageIcon, Trash2,
   Camera, DollarSign, Sprout, Info, Settings, ArrowUpDown,
   ExternalLink
@@ -36,9 +36,19 @@ interface Plant {
   children?: { id: number, name: string, guid: string }[];
 }
 
+interface PlantSummary {
+  totalPlants: number;
+  needsAttention: number;
+  propagating: number;
+  readyToSell: number;
+  distinctLocations: number;
+  totalEstimatedValue: number;
+}
+
 function App() {
   const [plants, setPlants] = useState<Plant[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
+  const [summary, setSummary] = useState<PlantSummary | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('nextWaterDate');
   const [sortAnchor, setSortAnchor] = useState<null | HTMLElement>(null);
@@ -75,14 +85,21 @@ function App() {
     setLocations(res.data);
   };
 
+  const fetchSummary = async () => {
+    const res = await axios.get('/api/plants/summary');
+    setSummary(res.data);
+  };
+
   useEffect(() => {
     fetchPlants();
     fetchLocations();
+    fetchSummary();
   }, [sortBy]);
 
   const handleWater = async (id: number) => {
     await axios.post(`/api/plants/${id}/water`);
     fetchPlants(searchTerm);
+    fetchSummary();
     if (selectedPlant?.id === id) handleViewDetails(id);
   };
 
@@ -90,6 +107,7 @@ function App() {
     await axios.post(`/api/plants/${id}/propagate`);
     fetchPlants(searchTerm);
     fetchLocations();
+    fetchSummary();
   };
 
   const handleDelete = async (id: number) => {
@@ -97,6 +115,7 @@ function App() {
       await axios.delete(`/api/plants/${id}`);
       setSelectedPlant(null);
       fetchPlants(searchTerm);
+      fetchSummary();
     }
   };
 
@@ -105,6 +124,7 @@ function App() {
     setOpenAdd(false);
     fetchPlants();
     fetchLocations();
+    fetchSummary();
     setNewPlant({ name: '', type: '', wateringFrequencyDays: 7, location: '', goodForTerrariums: false });
   };
 
@@ -112,6 +132,7 @@ function App() {
     if (!selectedPlant) return;
     await axios.put(`/api/plants/${selectedPlant.id}`, selectedPlant);
     fetchPlants(searchTerm);
+    fetchSummary();
     setOpenAdd(false);
   };
 
@@ -136,6 +157,7 @@ function App() {
       const plant = plantRes.data;
       await axios.put(`/api/plants/${uploadingPlantId}`, { ...plant, imagePath: filename });
       fetchPlants(searchTerm);
+      fetchSummary();
       if (selectedPlant?.id === uploadingPlantId) handleViewDetails(uploadingPlantId);
     } catch (error) { console.error('Upload failed', error); } finally { setUploadingPlantId(null); }
   };
@@ -167,6 +189,34 @@ function App() {
       </AppBar>
 
       <Container sx={{ mt: 3, pb: 10 }}>
+        {summary && (
+          <Grid container spacing={2} sx={{ mb: 4 }}>
+            <Grid item xs={6} sm={3}>
+              <Card elevation={1} sx={{ p: 2, textAlign: 'center' }}>
+                <Typography variant="h5" color="primary" sx={{ fontWeight: 'bold' }}>{summary.totalPlants}</Typography>
+                <Typography variant="caption" color="textSecondary">Total Plants</Typography>
+              </Card>
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <Card elevation={1} sx={{ p: 2, textAlign: 'center' }}>
+                <Typography variant="h5" color="error" sx={{ fontWeight: 'bold' }}>{summary.needsAttention}</Typography>
+                <Typography variant="caption" color="textSecondary">Needs Attention</Typography>
+              </Card>
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <Card elevation={1} sx={{ p: 2, textAlign: 'center' }}>
+                <Typography variant="h5" color="secondary" sx={{ fontWeight: 'bold' }}>{summary.propagating}</Typography>
+                <Typography variant="caption" color="textSecondary">Propagating</Typography>
+              </Card>
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <Card elevation={1} sx={{ p: 2, textAlign: 'center' }}>
+                <Typography variant="h5" color="success.main" sx={{ fontWeight: 'bold' }}>${summary.totalEstimatedValue.toFixed(2)}</Typography>
+                <Typography variant="caption" color="textSecondary">Estimated Value</Typography>
+              </Card>
+            </Grid>
+          </Grid>
+        )}
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Button variant="contained" size="small" startIcon={<AlertCircle />} onClick={() => fetchPlants('Needs Attention')} color="error">Needs Attention</Button>
@@ -223,7 +273,7 @@ function App() {
                 <CardActions sx={{ px: 2, pb: 2, justifyContent: 'space-between' }}>
                   <Box>
                     <Tooltip title="Water Now"><IconButton size="small" color="primary" onClick={(e) => {e.stopPropagation(); handleWater(plant.id)}}><Droplet size={18} /></IconButton></Tooltip>
-                    <Tooltip title="Propagate"><IconButton size="small" color="secondary" onClick={(e) => {e.stopPropagation(); handlePropagate(plant.id)}}><Scissor size={18} /></IconButton></Tooltip>
+                    <Tooltip title="Propagate"><IconButton size="small" color="secondary" onClick={(e) => {e.stopPropagation(); handlePropagate(plant.id)}}><Scissors size={18} /></IconButton></Tooltip>
                   </Box>
                   <IconButton size="small" onClick={(e) => {e.stopPropagation(); triggerUpload(plant.id)}}><Camera size={18} /></IconButton>
                 </CardActions>
