@@ -13,8 +13,8 @@ import {
   ExternalLink
 } from 'lucide-react'
 import axios from 'axios'
-import SimpleMDE from 'react-simplemde-editor'
-import 'easymde/dist/easymde.min.css'
+import ReactQuill from 'react-quill'
+import 'react-quill/dist/quill.snow.css'
 
 interface Plant {
   id: number;
@@ -59,6 +59,10 @@ function App() {
   const [openAdd, setOpenAdd] = useState(false);
   const [selectedPlant, setSelectedPlant] = useState<Plant | null>(null);
   const [fullImage, setFullImage] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [plantToDelete, setPlantToDelete] = useState<number | null>(null);
+  const [errorOpen, setErrorOpen] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const [detailTab, setDetailTab] = useState(0);
   const [editMode, setEditMode] = useState(false);
 
@@ -114,13 +118,29 @@ function App() {
     fetchSummary();
   };
 
-  const handleDelete = async (id: number) => {
-    if (window.confirm('Delete this plant?')) {
-      await axios.delete(`/api/plants/${id}`);
+  const showError = (msg: string) => {
+    setErrorMsg(msg);
+    setErrorOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (plantToDelete === null) return;
+    try {
+      await axios.delete(`/api/plants/${plantToDelete}`);
       setSelectedPlant(null);
+      setDeleteConfirmOpen(false);
+      setPlantToDelete(null);
       fetchPlants(searchTerm);
       fetchSummary();
+    } catch (error) {
+      console.error('Delete failed:', error);
+      showError('Failed to delete plant. Please try again.');
     }
+  };
+
+  const triggerDelete = (id: number) => {
+    setPlantToDelete(id);
+    setDeleteConfirmOpen(true);
   };
 
   const handleAddPlant = async () => {
@@ -146,7 +166,7 @@ function App() {
       setSelectedPlant(null);
     } catch (error) {
       console.error('Update failed:', error);
-      alert('Failed to save changes. Check console for details.');
+      showError('Failed to save changes. Please check your connection.');
     }
   };
 
@@ -170,7 +190,7 @@ function App() {
       if (selectedPlant?.id === uploadingPlantId) handleViewDetails(uploadingPlantId);
     } catch (error) { 
       console.error('Upload failed', error);
-      alert('Upload failed. Check console for details.');
+      showError('Upload failed. The image might be too large or the server is busy.');
     } finally { 
       setUploadingPlantId(null); 
     }
@@ -336,7 +356,7 @@ function App() {
                 <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{selectedPlant.name}</Typography>
                 <Typography variant="caption" color="textSecondary">#{selectedPlant.id} | GUID: {selectedPlant.guid}</Typography>
               </Box>
-              <IconButton color="error" onClick={() => handleDelete(selectedPlant.id)}><Trash2 size={20} /></IconButton>
+              <IconButton color="error" onClick={() => triggerDelete(selectedPlant.id)}><Trash2 size={20} /></IconButton>
             </DialogTitle>
             <DialogContent sx={{ minHeight: 500 }}>
               <Tabs value={detailTab} onChange={(_, v) => { setDetailTab(v); setEditMode(false); }} sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }} variant="scrollable" scrollButtons="auto">
@@ -385,15 +405,18 @@ function App() {
               )}
 
               {detailTab === 1 && (
-                <Box sx={{ '& .editor-toolbar': { borderRadius: '8px 8px 0 0' }, '& .CodeMirror': { borderRadius: '0 0 8px 8px', minHeight: 300 } }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>Care Instructions (Markdown)</Typography>
-                  <SimpleMDE 
+                <Box sx={{ '& .ql-container': { minHeight: 300, borderRadius: '0 0 8px 8px' }, '& .ql-toolbar': { borderRadius: '8px 8px 0 0' } }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>Care Instructions</Typography>
+                  <ReactQuill 
+                    theme="snow" 
                     value={selectedPlant.careInstructions || ''} 
-                    onChange={(val) => setSelectedPlant({...selectedPlant, careInstructions: val})}
-                    options={{
-                      spellChecker: false,
-                      toolbar: ['bold', 'italic', 'heading', '|', 'quote', 'unordered-list', 'ordered-list', '|', 'preview', 'side-by-side', 'fullscreen'],
-                      status: false
+                    onChange={(content) => setSelectedPlant({...selectedPlant, careInstructions: content})}
+                    modules={{
+                      toolbar: [
+                        ['bold', 'italic', 'underline'],
+                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                        ['clean']
+                      ],
                     }}
                   />
                 </Box>
@@ -401,15 +424,18 @@ function App() {
 
               {detailTab === 2 && (
                 <Box>
-                  <Box sx={{ '& .editor-toolbar': { borderRadius: '8px 8px 0 0' }, '& .CodeMirror': { borderRadius: '0 0 8px 8px', minHeight: 300 }, mb: 3 }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>Propagation Notes (Markdown)</Typography>
-                    <SimpleMDE 
+                  <Box sx={{ '& .ql-container': { minHeight: 300, borderRadius: '0 0 8px 8px' }, '& .ql-toolbar': { borderRadius: '8px 8px 0 0' }, mb: 3 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>Propagation Notes</Typography>
+                    <ReactQuill 
+                      theme="snow" 
                       value={selectedPlant.propagationInstructions || ''} 
-                      onChange={(val) => setSelectedPlant({...selectedPlant, propagationInstructions: val})}
-                      options={{
-                        spellChecker: false,
-                        toolbar: ['bold', 'italic', 'heading', '|', 'quote', 'unordered-list', 'ordered-list', '|', 'preview', 'side-by-side', 'fullscreen'],
-                        status: false
+                      onChange={(content) => setSelectedPlant({...selectedPlant, propagationInstructions: content})}
+                      modules={{
+                        toolbar: [
+                          ['bold', 'italic', 'underline'],
+                          [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                          ['clean']
+                        ],
                       }}
                     />
                   </Box>
@@ -526,6 +552,37 @@ function App() {
             />
           )}
         </Box>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} maxWidth="xs">
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <AlertCircle color="#ed6c02" /> 
+          Confirm Deletion
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1">
+            Are you sure you want to delete this plant? This action cannot be undone and will remove all history and photos associated with it.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDeleteConfirmOpen(false)} color="inherit">Cancel</Button>
+          <Button onClick={handleDelete} variant="contained" color="error">Delete Plant</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Error Dialog */}
+      <Dialog open={errorOpen} onClose={() => setErrorOpen(false)} maxWidth="xs">
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'error.main' }}>
+          <AlertCircle /> 
+          Oops! Something went wrong
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1">{errorMsg}</Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setErrorOpen(false)} variant="contained" color="primary">Dismiss</Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );
