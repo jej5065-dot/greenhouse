@@ -1,36 +1,39 @@
-# Greenhouse Project
+# Greenhouse - Plant Tracking & Inventory System
 
-## Project Overview
-This is a Java-based project named **greenhouse**. It is a modern Java application leveraging recent Java features (Java 25 LTS). The project uses a standard Gradle-based structure.
+A full-stack application for managing plant inventory, tracking watering schedules, and recording propagation lineage.
 
-### Key Technologies
-- **Java**: Version 25 (LTS)
-- **Build System**: Gradle
-- **Testing Framework**: JUnit Jupiter (configured)
+## Architecture
+- **Backend**: Spring Boot 3.4 (Java 21)
+- **Database**: SQLite (local `greenhouse.db`)
+- **Frontend**: React (TypeScript) + Vite + Material UI
+- **Storage**: Local `uploads/` directory for plant photos
 
-## Building and Running
-The project uses the Gradle wrapper for consistent builds.
+## Getting Started
 
-- **Build the project**:
-  ```bash
-  ./gradlew build
-  ```
-- **Run the application**:
-  Currently, the `application` plugin is not applied in `build.gradle`. To run the application, you can use:
-  ```bash
-  ./gradlew classes
-  java -cp build/classes/java/main org.dined.dined.Main
-  ```
-  *Note: The project uses modern Java features like `IO.println` and instance main methods.*
+### Prerequisites
+- Java 21+
+- Node.js 18+ & npm
 
-- **Run tests**:
-  ```bash
-  ./gradlew test
-  ```
+### Running the Backend
+```bash
+./gradlew bootRun
+```
+The API will be available at `http://localhost:8080`.
 
-## Development Conventions
-- **Source Code**: Located in `src/main/java`.
-- **Package Structure**: Follows `org.dined.dined`.
-- **Main Entry Point**: `src/main/java/org/dined/dined/Main.java`.
-- **Tests**: Should be placed in `src/test/java` using JUnit 5.
-- **Dependencies**: Managed via `build.gradle`.
+### Running the Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+The frontend will be available at `http://localhost:5173`.
+
+## MVP Features
+- **Plant Inventory**: Comprehensive tracking with 20+ fields.
+- **Search**: Fast search by ID, GUID, or Name.
+- **Quick Actions**:
+  - 💧 **Water**: Update last watered date instantly.
+  - ✂️ **Propagate**: Create a new cutting from a parent plant.
+- **Lineage**: Track parent/child relationships between plants.
+- **Photo Support**: Upload and view plant photos.
+- **Mobile Friendly**: Designed with Material Design for mobile browsers.
