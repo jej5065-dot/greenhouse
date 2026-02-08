@@ -31,6 +31,53 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+// 1. Build and bundle the frontend into the backend JAR
+task buildFrontend(type: Exec) {
+    workingDir 'frontend'
+    // Use absolute path for npm found on system
+    def npmPath = '/opt/homebrew/bin/npm'
+    if (System.getProperty('os.name').toLowerCase().contains('windows')) {
+        commandLine 'npm.cmd', 'run', 'build'
+    } else {
+        commandLine npmPath, 'run', 'build'
+    }
+}
+
+task copyFrontend(type: Copy) {
+    dependsOn buildFrontend
+    from 'frontend/dist'
+    into 'src/main/resources/static'
+}
+
+// Ensure frontend is built before the JAR is created
+processResources.dependsOn copyFrontend
+
+// 2. Deployment configuration
+ext {
+    remoteUser = 'jason'
+    remoteHost = '192.168.68.94'
+    jarName = 'greenhouse.jar'
+    deployDir = '/opt/greenhouse'
+}
+
+task deployToRemote(type: Exec) {
+    dependsOn bootJar
+    def jarPath = "${buildDir}/libs/greenhouse-1.0-SNAPSHOT.jar"
+
+    workingDir projectDir
+
+    commandLine 'bash', '-c', """
+        echo ">> Copying JAR to ${deployDir} on ${remoteHost}..."
+        scp -o StrictHostKeyChecking=no "${jarPath}" ${remoteUser}@${remoteHost}:${deployDir}/${jarName}
+        
+        echo ">> Restarting Greenhouse service..."
+        ssh -o StrictHostKeyChecking=no ${remoteUser}@${remoteHost} "sudo systemctl restart greenhouse"
+        
+        echo ">> Deployment Successful! App will be available on http://${remoteHost}:3000"
+        echo ">> You can check logs with: ssh ${remoteUser}@${remoteHost} 'journalctl -u greenhouse -f'"
+    """
+}
+
 test {
     useJUnitPlatform()
 }
