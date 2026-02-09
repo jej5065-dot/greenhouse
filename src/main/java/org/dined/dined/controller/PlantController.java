@@ -1,7 +1,9 @@
 package org.dined.dined.controller;
 
 import org.dined.dined.model.Plant;
+import org.dined.dined.model.PlantImage;
 import org.dined.dined.model.PlantSummary;
+import org.dined.dined.model.PlantUpdate;
 import org.dined.dined.service.PlantService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -78,10 +80,22 @@ public class PlantController {
         return plantService.propagatePlant(id);
     }
 
-    @PostMapping("/{id}/upload")
-    public ResponseEntity<Plant> uploadImageForPlant(@PathVariable Long id, @RequestParam("file") MultipartFile file) throws IOException {
-        Plant updatedPlant = plantService.updatePlantImage(id, file);
-        return ResponseEntity.ok(updatedPlant);
+    @PostMapping("/{id}/updates")
+    public PlantUpdate addUpdate(@PathVariable Long id, @RequestBody PlantUpdate update) {
+        return plantService.addUpdate(id, update);
+    }
+
+    @PostMapping("/updates/{updateId}/images")
+    public PlantImage addImageToUpdate(
+            @PathVariable Long updateId, 
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(required = false) String label) throws IOException {
+        return plantService.addImageToUpdate(updateId, file, label);
+    }
+
+    @PutMapping("/images/{imageId}/rotation")
+    public PlantImage updateRotation(@PathVariable Long imageId, @RequestBody Integer rotation) {
+        return plantService.updateImageRotation(imageId, rotation);
     }
 
     @PostMapping("/upload")

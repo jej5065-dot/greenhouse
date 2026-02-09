@@ -1,8 +1,12 @@
 package org.dined.dined.service;
 
 import org.dined.dined.model.Plant;
+import org.dined.dined.model.PlantImage;
 import org.dined.dined.model.PlantSummary;
+import org.dined.dined.model.PlantUpdate;
+import org.dined.dined.repository.PlantImageRepository;
 import org.dined.dined.repository.PlantRepository;
+import org.dined.dined.repository.PlantUpdateRepository;
 import org.imgscalr.Scalr;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -11,9 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -29,6 +31,12 @@ public class PlantService {
 
     @Autowired
     private PlantRepository plantRepository;
+
+    @Autowired
+    private PlantUpdateRepository updateRepository;
+
+    @Autowired
+    private PlantImageRepository imageRepository;
 
     private final Path root = Paths.get("uploads");
 
@@ -69,6 +77,39 @@ public class PlantService {
                 .guid(UUID.randomUUID().toString())
                 .build();
         return plantRepository.save(cutting);
+    }
+
+    public PlantUpdate addUpdate(Long plantId, PlantUpdate update) {
+        Plant plant = getPlantById(plantId);
+        update.setPlant(plant);
+        if (update.getDate() == null) {
+            update.setDate(LocalDate.now());
+        }
+        return updateRepository.save(update);
+    }
+
+    public PlantImage addImageToUpdate(Long updateId, MultipartFile file, String label) throws IOException {
+        PlantUpdate update = updateRepository.findById(updateId).orElseThrow(() -> new RuntimeException("Update not found"));
+        String filename = saveImage(file);
+        
+        PlantImage image = PlantImage.builder()
+                .imagePath(filename)
+                .label(label)
+                .update(update)
+                .build();
+        
+        // Also update the plant's main cover photo to the latest upload
+        Plant plant = update.getPlant();
+        plant.setImagePath(filename);
+        plantRepository.save(plant);
+
+        return imageRepository.save(image);
+    }
+
+    public PlantImage updateImageRotation(Long imageId, Integer rotation) {
+        PlantImage image = imageRepository.findById(imageId).orElseThrow(() -> new RuntimeException("Image not found"));
+        image.setRotation(rotation);
+        return imageRepository.save(image);
     }
 
     public String saveImage(MultipartFile file) throws IOException {
@@ -135,13 +176,6 @@ public class PlantService {
                 .sum();
 
         return new PlantSummary(totalPlants, needsAttention, propagating, readyToSell, distinctLocations, totalEstimatedValue);
-    }
-
-    public Plant updatePlantImage(Long id, MultipartFile file) throws IOException {
-        String filename = saveImage(file);
-        Plant plant = getPlantById(id);
-        plant.setImagePath(filename);
-        return plantRepository.save(plant);
     }
 
     public List<Plant> searchPlants(String term) {

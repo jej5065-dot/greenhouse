@@ -43,6 +43,12 @@ public class Plant {
     @JsonIgnoreProperties("parent")
     private List<Plant> children = new ArrayList<>();
 
+    @OneToMany(mappedBy = "plant", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    @OrderBy("date DESC")
+    @JsonIgnoreProperties("plant")
+    private List<PlantUpdate> updates = new ArrayList<>();
+
     private LocalDate cuttingDate;
     private LocalDateTime lastWateredDate;
     private String location;
