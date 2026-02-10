@@ -45,15 +45,13 @@ public class PlantController {
         
         // Update basic fields
         existing.setName(plant.getName());
-        existing.setType(plant.getType());
+        existing.setPlantType(plant.getPlantType());
         existing.setLocation(plant.getLocation());
         existing.setStatus(plant.getStatus());
         existing.setGoodForTerrariums(plant.isGoodForTerrariums());
         existing.setWateringFrequencyDays(plant.getWateringFrequencyDays());
         
-        // Update care info
-        existing.setCareInstructions(plant.getCareInstructions());
-        existing.setPropagationInstructions(plant.getPropagationInstructions());
+        // Update care info (now mostly via type, but kept total prop time)
         existing.setTotalPropagationTime(plant.getTotalPropagationTime());
         
         // Update financials

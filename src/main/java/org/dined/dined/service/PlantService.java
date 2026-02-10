@@ -3,9 +3,11 @@ package org.dined.dined.service;
 import org.dined.dined.model.Plant;
 import org.dined.dined.model.PlantImage;
 import org.dined.dined.model.PlantSummary;
+import org.dined.dined.model.PlantType;
 import org.dined.dined.model.PlantUpdate;
 import org.dined.dined.repository.PlantImageRepository;
 import org.dined.dined.repository.PlantRepository;
+import org.dined.dined.repository.PlantTypeRepository;
 import org.dined.dined.repository.PlantUpdateRepository;
 import org.imgscalr.Scalr;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +40,9 @@ public class PlantService {
     @Autowired
     private PlantImageRepository imageRepository;
 
+    @Autowired
+    private PlantTypeRepository plantTypeRepository;
+
     private final Path root = Paths.get("uploads");
 
     public List<Plant> getAllPlants() {
@@ -49,6 +54,17 @@ public class PlantService {
     }
 
     public Plant savePlant(Plant plant) {
+        // Handle dynamic PlantType creation/linking
+        if (plant.getPlantType() != null && plant.getPlantType().getId() == null) {
+            String typeName = plant.getPlantType().getName();
+            if (typeName != null && !typeName.trim().isEmpty()) {
+                PlantType type = plantTypeRepository.findByName(typeName)
+                        .orElseGet(() -> plantTypeRepository.save(PlantType.builder().name(typeName).build()));
+                plant.setPlantType(type);
+            } else {
+                plant.setPlantType(null);
+            }
+        }
         return plantRepository.save(plant);
     }
 
@@ -66,9 +82,7 @@ public class PlantService {
         Plant parent = getPlantById(id);
         Plant cutting = Plant.builder()
                 .name(parent.getName() + " (Cutting)")
-                .type(parent.getType())
-                .careInstructions(parent.getCareInstructions())
-                .propagationInstructions(parent.getPropagationInstructions())
+                .plantType(parent.getPlantType())
                 .parent(parent)
                 .cuttingDate(LocalDate.now())
                 .status("Propagating")

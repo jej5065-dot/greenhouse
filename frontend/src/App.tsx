@@ -17,8 +17,19 @@ import ReactQuill from 'react-quill'
 import 'react-quill/dist/quill.snow.css'
 import { 
   RotateCw, MessageSquare, History, Check, X, Camera as CameraIcon,
-  Image as GalleryIcon, ChevronLeft, ChevronRight
+  Image as GalleryIcon, ChevronLeft, ChevronRight, FileUp, ShieldAlert
 } from 'lucide-react'
+
+interface PlantType {
+  id: number;
+  name: string;
+  scientificName: string;
+  otherNames: string;
+  petToxicity: string;
+  careInstructions: string;
+  propagationInstructions: string;
+  defaultWateringFrequencyDays: number;
+}
 
 interface PlantImage {
   id: number;
@@ -38,14 +49,12 @@ interface Plant {
   id: number;
   guid: string;
   name: string;
-  type: string;
+  plantType?: PlantType;
   status: string;
   nextWaterDate: string;
   lastWateredDate: string;
   location: string;
   imagePath: string;
-  careInstructions?: string;
-  propagationInstructions?: string;
   goodForTerrariums: boolean;
   wateringFrequencyDays: number;
   price?: number;
@@ -69,6 +78,7 @@ interface PlantSummary {
 
 function App() {
   const [plants, setPlants] = useState<Plant[]>([]);
+  const [plantTypes, setPlantTypes] = useState<PlantType[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
   const [summary, setSummary] = useState<PlantSummary | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -93,11 +103,12 @@ function App() {
   const [imageToLabel, setImageToLabel] = useState<{id: number, label: string} | null>(null);
 
   const [newPlant, setNewPlant] = useState<Partial<Plant>>({ 
-    name: '', type: '', wateringFrequencyDays: 7, location: '',
+    name: '', wateringFrequencyDays: 7, location: '',
     goodForTerrariums: false, status: 'Active'
   });
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const csvInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPlantId, setUploadingPlantId] = useState<number | null>(null);
 
   const fetchPlants = async (search = '') => {
@@ -119,6 +130,11 @@ function App() {
     setLocations(res.data);
   };
 
+  const fetchPlantTypes = async () => {
+    const res = await axios.get('/api/plant-types');
+    setPlantTypes(res.data);
+  };
+
   const fetchSummary = async () => {
     const res = await axios.get('/api/plants/summary');
     setSummary(res.data);
@@ -127,8 +143,21 @@ function App() {
   useEffect(() => {
     fetchPlants();
     fetchLocations();
+    fetchPlantTypes();
     fetchSummary();
   }, [sortBy]);
+
+  const handleCsvUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      await axios.post('/api/plant-types/import', formData);
+      fetchPlantTypes();
+      alert('Library updated successfully!');
+    } catch (error) { showError('CSV Import failed.'); }
+  };
 
   const handleWater = async (id: number) => {
     await axios.post(`/api/plants/${id}/water`);
@@ -182,7 +211,7 @@ function App() {
       await fetchPlants();
       await fetchLocations();
       await fetchSummary();
-      setNewPlant({ name: '', type: '', wateringFrequencyDays: 7, location: '', goodForTerrariums: false, status: 'Active' });
+      setNewPlant({ name: '', wateringFrequencyDays: 7, location: '', goodForTerrariums: false, status: 'Active' });
     } catch (error: any) {
       console.error('Add plant failed:', error);
       showError(`Failed to add plant: ${error.response?.data?.message || 'Check connection'}`);
@@ -318,7 +347,8 @@ function App() {
 
   return (
     <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: 'background.default' }}>
-      <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} ref={fileInputRef} onChange={handleFileUpload} />
+      <input type="file" accept="image/*" style={{ display: 'none' }} ref={fileInputRef} onChange={handleFileUpload} />
+      <input type="file" accept=".csv" style={{ display: 'none' }} ref={csvInputRef} onChange={handleCsvUpload} />
       
       <AppBar position="sticky" elevation={0} sx={{ borderBottom: '1px solid #e0e0e0' }}>
         <Toolbar>
@@ -326,20 +356,25 @@ function App() {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
             Greenhouse
           </Typography>
-          <Box component="form" onSubmit={(e) => {e.preventDefault(); fetchPlants(searchTerm)}} sx={{ display: 'flex', alignItems: 'center', bgcolor: 'rgba(255,255,255,0.2)', borderRadius: 2, px: 1.5 }}>
-            <Search size={18} color="white" />
-            <TextField 
-              placeholder="Search..." variant="standard" size="small" value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              sx={{ 
-                ml: 1, 
-                width: { xs: 100, sm: 200 }, 
-                '& .MuiInputBase-input': { color: 'white', py: 0.5 },
-                '& .MuiInput-underline:before': { borderBottom: 'none' },
-                '& .MuiInput-underline:after': { borderBottom: 'none' },
-                '& .MuiInput-underline:hover:not(.Mui-disabled):before': { borderBottom: 'none' }
-              }}
-            />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Tooltip title="Import Plant Library (CSV)">
+              <IconButton color="inherit" onClick={() => csvInputRef.current?.click()}><FileUp size={20} /></IconButton>
+            </Tooltip>
+            <Box component="form" onSubmit={(e) => {e.preventDefault(); fetchPlants(searchTerm)}} sx={{ display: 'flex', alignItems: 'center', bgcolor: 'rgba(255,255,255,0.2)', borderRadius: 2, px: 1.5 }}>
+              <Search size={18} color="white" />
+              <TextField 
+                placeholder="Search..." variant="standard" size="small" value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                sx={{ 
+                  ml: 1, 
+                  width: { xs: 100, sm: 200 }, 
+                  '& .MuiInputBase-input': { color: 'white', py: 0.5 },
+                  '& .MuiInput-underline:before': { borderBottom: 'none' },
+                  '& .MuiInput-underline:after': { borderBottom: 'none' },
+                  '& .MuiInput-underline:hover:not(.Mui-disabled):before': { borderBottom: 'none' }
+                }}
+              />
+            </Box>
           </Box>
         </Toolbar>
       </AppBar>
@@ -433,12 +468,24 @@ function App() {
                   />
                 </Box>
                 <CardContent sx={{ pb: 1 }} onClick={() => handleViewDetails(plant.id)} style={{ cursor: 'pointer' }}>
-                  <Typography variant="caption" color="textSecondary" sx={{ fontWeight: 500 }}>
-                    #{plant.id} • {plant.type || 'Plant'}
-                  </Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Typography variant="caption" color="textSecondary" sx={{ fontWeight: 500 }}>
+                      #{plant.id} • {plant.plantType?.name || 'Unknown Type'}
+                    </Typography>
+                    {plant.plantType?.petToxicity && (
+                      <Tooltip title={`Toxicity: ${plant.plantType.petToxicity}`}>
+                        <ShieldAlert size={14} color="#d32f2f" />
+                      </Tooltip>
+                    )}
+                  </Box>
+                  <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {plant.name}
                   </Typography>
+                  {plant.plantType?.scientificName && (
+                    <Typography variant="caption" color="textSecondary" sx={{ fontStyle: 'italic', display: 'block', mb: 1 }}>
+                      {plant.plantType.scientificName}
+                    </Typography>
+                  )}
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                     <MapPin size={14} />
                     <Typography variant="body2" color="textSecondary">{plant.location || 'Unknown'}</Typography>
@@ -476,7 +523,8 @@ function App() {
             </DialogTitle>
             <DialogContent sx={{ minHeight: 500 }}>
               <Tabs value={detailTab} onChange={(_, v) => setDetailTab(v)} sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }} variant="scrollable" scrollButtons="auto">
-                <Tab label="Info" icon={<Info size={16} />} iconPosition="start" />
+                <Tab label="General" icon={<Info size={16} />} iconPosition="start" />
+                <Tab label="Plant Info" icon={<Sprout size={16} />} iconPosition="start" />
                 <Tab label="History & Gallery" icon={<History size={16} />} iconPosition="start" />
                 <Tab label="Care" icon={<Settings size={16} />} iconPosition="start" />
                 <Tab label="Propagation" icon={<Scissors size={16} />} iconPosition="start" />
@@ -515,7 +563,30 @@ function App() {
                     </Box>
                   </Grid>
                   <Grid item xs={12} sm={6}><TextField fullWidth label="Name" value={selectedPlant.name} onChange={(e) => setSelectedPlant({...selectedPlant, name: e.target.value})} size="small" /></Grid>
-                  <Grid item xs={12} sm={6}><TextField fullWidth label="Type" value={selectedPlant.type} onChange={(e) => setSelectedPlant({...selectedPlant, type: e.target.value})} size="small" /></Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Autocomplete 
+                      freeSolo
+                      forcePopupIcon
+                      options={plantTypes} 
+                      getOptionLabel={(o) => {
+                        if (typeof o === 'string') return o;
+                        return o.name || '';
+                      }} 
+                      value={selectedPlant.plantType || null}
+                      onChange={(_, n) => {
+                        let val: any = n;
+                        if (typeof n === 'string') {
+                          val = { name: n };
+                        }
+                        setSelectedPlant({
+                          ...selectedPlant, 
+                          plantType: val || undefined,
+                          wateringFrequencyDays: val?.defaultWateringFrequencyDays || selectedPlant.wateringFrequencyDays
+                        });
+                      }}
+                      renderInput={(p) => <TextField {...p} label="Plant Type" size="small" />} 
+                    />
+                  </Grid>
                   <Grid item xs={12} sm={6}>
                     <Autocomplete freeSolo options={locations} value={selectedPlant.location} onInputChange={(_, n) => setSelectedPlant({...selectedPlant, location: n})} renderInput={(p) => <TextField {...p} label="Location" size="small" />} />
                   </Grid>
@@ -528,6 +599,39 @@ function App() {
               )}
 
               {detailTab === 1 && (
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3 }}>Species Specification</Typography>
+                  
+                  <Grid container spacing={3}>
+                    <Grid item xs={12}>
+                      <Typography variant="subtitle2" color="textSecondary">Common Name</Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 'medium' }}>{selectedPlant.plantType?.name || 'Unknown'}</Typography>
+                    </Grid>
+                    
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="textSecondary">Scientific Name</Typography>
+                      <Typography variant="body1" sx={{ fontStyle: 'italic' }}>{selectedPlant.plantType?.scientificName || 'Not recorded'}</Typography>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="textSecondary">Other Names</Typography>
+                      <Typography variant="body1">{selectedPlant.plantType?.otherNames || 'None'}</Typography>
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <Box sx={{ p: 2, bgcolor: selectedPlant.plantType?.petToxicity?.toLowerCase().includes('safe') ? '#f1f8e9' : '#fff3e0', borderRadius: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <ShieldAlert color={selectedPlant.plantType?.petToxicity?.toLowerCase().includes('safe') ? '#2e7d32' : '#ed6c02'} />
+                        <Box>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Pet Toxicity</Typography>
+                          <Typography variant="body2">{selectedPlant.plantType?.petToxicity || 'Toxicity information not available.'}</Typography>
+                        </Box>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </Box>
+              )}
+
+              {detailTab === 2 && (
                 <Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
                     <Typography variant="h6" sx={{ fontWeight: 'bold' }}>History & Photos</Typography>
@@ -596,46 +700,28 @@ function App() {
                 </Box>
               )}
 
-              {detailTab === 2 && (
-                <Box sx={{ '& .ql-container': { minHeight: 300, borderRadius: '0 0 8px 8px' }, '& .ql-toolbar': { borderRadius: '8px 8px 0 0' } }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>Care Instructions</Typography>
-                  <ReactQuill 
-                    theme="snow" 
-                    value={selectedPlant.careInstructions || ''} 
-                    onChange={(content) => setSelectedPlant({...selectedPlant, careInstructions: content})}
-                    modules={{
-                      toolbar: [
-                        ['bold', 'italic', 'underline'],
-                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                        ['clean']
-                      ],
-                    }}
-                  />
+              {detailTab === 3 && (
+                <Box sx={{ minHeight: 300 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>Master Care Instructions</Typography>
+                  <Typography variant="caption" color="textSecondary" sx={{ mb: 3, display: 'block' }}>Derived from {selectedPlant.plantType?.name || 'Unknown Type'}</Typography>
+                  <Box sx={{ bgcolor: '#fafafa', p: 2, borderRadius: 2, border: '1px solid #eee' }}>
+                    <div dangerouslySetInnerHTML={{ __html: selectedPlant.plantType?.careInstructions || 'No care instructions in library.' }} />
+                  </Box>
                 </Box>
               )}
 
-              {detailTab === 3 && (
+              {detailTab === 4 && (
                 <Box>
-                  <Box sx={{ '& .ql-container': { minHeight: 300, borderRadius: '0 0 8px 8px' }, '& .ql-toolbar': { borderRadius: '8px 8px 0 0' }, mb: 3 }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>Propagation Notes</Typography>
-                    <ReactQuill 
-                      theme="snow" 
-                      value={selectedPlant.propagationInstructions || ''} 
-                      onChange={(content) => setSelectedPlant({...selectedPlant, propagationInstructions: content})}
-                      modules={{
-                        toolbar: [
-                          ['bold', 'italic', 'underline'],
-                          [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                          ['clean']
-                        ],
-                      }}
-                    />
+                  <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>Master Propagation Notes</Typography>
+                  <Typography variant="caption" color="textSecondary" sx={{ mb: 3, display: 'block' }}>Derived from {selectedPlant.plantType?.name || 'Unknown Type'}</Typography>
+                  <Box sx={{ bgcolor: '#fafafa', p: 2, borderRadius: 2, border: '1px solid #eee', mb: 3 }}>
+                    <div dangerouslySetInnerHTML={{ __html: selectedPlant.plantType?.propagationInstructions || 'No propagation notes in library.' }} />
                   </Box>
                   <TextField fullWidth label="Total Propagation Time" value={selectedPlant.totalPropagationTime || ''} onChange={(e) => setSelectedPlant({...selectedPlant, totalPropagationTime: e.target.value})} size="small" placeholder="e.g. 4 weeks to root" />
                 </Box>
               )}
 
-              {detailTab === 4 && (
+              {detailTab === 5 && (
                 <Box sx={{ py: 1 }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>Parent Source</Typography>
                   {selectedPlant.parent ? (
@@ -659,7 +745,7 @@ function App() {
                 </Box>
               )}
 
-              {detailTab === 5 && (
+              {detailTab === 6 && (
                 <Grid container spacing={3}>
                   <Grid item xs={12} sm={6}>
                     <TextField 
@@ -717,9 +803,31 @@ function App() {
       <Dialog open={openAdd} onClose={() => setOpenAdd(false)} fullWidth maxWidth="xs">
         <DialogTitle>Quick Add Plant</DialogTitle>
         <DialogContent>
-          <TextField fullWidth label="Name" sx={{ mt: 1 }} value={newPlant.name} onChange={(e) => setNewPlant({...newPlant, name: e.target.value})} />
-          <TextField fullWidth label="Type" sx={{ mt: 2 }} value={newPlant.type} onChange={(e) => setNewPlant({...newPlant, type: e.target.value})} />
-          <Autocomplete freeSolo options={locations} value={newPlant.location} onInputChange={(_, n) => setNewPlant({...newPlant, location: n})} renderInput={(p) => <TextField {...p} label="Location" fullWidth sx={{ mt: 2 }} />} />
+          <TextField fullWidth label="Name" sx={{ mt: 1 }} value={newPlant.name} onChange={(e) => setNewPlant({...newPlant, name: e.target.value})} size="small" />
+          <Autocomplete 
+            sx={{ mt: 2 }}
+            freeSolo
+            forcePopupIcon
+            options={plantTypes} 
+            getOptionLabel={(o) => {
+              if (typeof o === 'string') return o;
+              return o.name || '';
+            }} 
+            value={newPlant.plantType || null}
+            onChange={(_, n) => {
+              let val: any = n;
+              if (typeof n === 'string') {
+                val = { name: n };
+              }
+              setNewPlant({
+                ...newPlant, 
+                plantType: val || undefined,
+                wateringFrequencyDays: val?.defaultWateringFrequencyDays || 7
+              });
+            }}
+            renderInput={(p) => <TextField {...p} label="Plant Type" size="small" />} 
+          />
+          <Autocomplete freeSolo options={locations} value={newPlant.location} onInputChange={(_, n) => setNewPlant({...newPlant, location: n})} renderInput={(p) => <TextField {...p} label="Location" fullWidth sx={{ mt: 2 }} size="small" />} />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenAdd(false)}>Cancel</Button>

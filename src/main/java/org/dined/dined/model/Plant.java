@@ -25,13 +25,10 @@ public class Plant {
     private String guid = UUID.randomUUID().toString();
 
     private String name;
-    private String type;
-    
-    @Column(length = 1000)
-    private String careInstructions;
-    
-    @Column(length = 1000)
-    private String propagationInstructions;
+
+    @ManyToOne
+    @JoinColumn(name = "plant_type_id")
+    private PlantType plantType;
 
     @ManyToOne
     @JoinColumn(name = "parent_id")
@@ -63,7 +60,7 @@ public class Plant {
     private LocalDate soldDate;
     private Double originalPurchasePrice;
     
-    private String totalPropagationTime; // Could be calculated, storing as string for now
+    private String totalPropagationTime;
     
     private String imagePath;
     

@@ -23,6 +23,7 @@ dependencies {
     implementation 'org.xerial:sqlite-jdbc:3.47.1.0'
     implementation 'org.hibernate.orm:hibernate-community-dialects:6.6.1.Final'
     implementation 'org.imgscalr:imgscalr-lib:4.2'
+    implementation 'org.apache.commons:commons-csv:1.10.0'
     
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
