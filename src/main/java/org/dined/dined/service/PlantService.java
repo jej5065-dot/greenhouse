@@ -112,6 +112,22 @@ public class PlantService {
         return imageRepository.save(image);
     }
 
+    public PlantImage updateImageLabel(Long imageId, String label) {
+        PlantImage image = imageRepository.findById(imageId).orElseThrow(() -> new RuntimeException("Image not found"));
+        image.setLabel(label);
+        return imageRepository.save(image);
+    }
+
+    public Plant setPlantCoverImage(Long plantId, Long imageId) {
+        Plant plant = getPlantById(plantId);
+        PlantImage image = imageRepository.findById(imageId).orElseThrow(() -> new RuntimeException("Image not found"));
+        
+        plant.setImagePath(image.getImagePath());
+        plant.setRotation(image.getRotation());
+        
+        return plantRepository.save(plant);
+    }
+
     public String saveImage(MultipartFile file) throws IOException {
         if (!Files.exists(root)) {
             Files.createDirectories(root);

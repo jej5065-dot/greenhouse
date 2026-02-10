@@ -8,7 +8,7 @@ import {
 } from '@mui/material'
 import { 
   Droplet, Scissors, Search, Plus, Calendar, MapPin, 
-  AlertCircle, ChevronRight, Image as ImageIcon, Trash2,
+  AlertCircle, Image as ImageIcon, Trash2,
   Camera, DollarSign, Sprout, Info, Settings, ArrowUpDown,
   ExternalLink
 } from 'lucide-react'
@@ -17,7 +17,7 @@ import ReactQuill from 'react-quill'
 import 'react-quill/dist/quill.snow.css'
 import { 
   RotateCw, MessageSquare, History, Check, X, Camera as CameraIcon,
-  Image as GalleryIcon
+  Image as GalleryIcon, ChevronLeft, ChevronRight
 } from 'lucide-react'
 
 interface PlantImage {
@@ -55,6 +55,7 @@ interface Plant {
   parent?: { id: number, name: string, guid: string };
   children?: { id: number, name: string, guid: string }[];
   updates: PlantUpdate[];
+  rotation?: number;
 }
 
 interface PlantSummary {
@@ -77,7 +78,7 @@ function App() {
   // Modals
   const [openAdd, setOpenAdd] = useState(false);
   const [selectedPlant, setSelectedPlant] = useState<Plant | null>(null);
-  const [fullImage, setFullImage] = useState<{path: string, rotation: number} | null>(null);
+  const [fullImage, setFullImage] = useState<{ images: {path: string, rotation: number, label?: string}[], index: number } | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [plantToDelete, setPlantToDelete] = useState<number | null>(null);
   const [errorOpen, setErrorOpen] = useState(false);
@@ -88,7 +89,8 @@ function App() {
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   const [newUpdate, setNewUpdate] = useState({ date: new Date().toISOString().split('T')[0], notes: '' });
   const [uploadingToUpdateId, setUploadingToUpdateId] = useState<number | null>(null);
-  const [imageLabel, setImageLabel] = useState('');
+  const [labelDialogOpen, setLabelDialogOpen] = useState(false);
+  const [imageToLabel, setImageToLabel] = useState<{id: number, label: string} | null>(null);
 
   const [newPlant, setNewPlant] = useState<Partial<Plant>>({ 
     name: '', type: '', wateringFrequencyDays: 7, location: '',
@@ -168,12 +170,23 @@ function App() {
   };
 
   const handleAddPlant = async () => {
-    await axios.post('/api/plants', newPlant);
-    setOpenAdd(false);
-    fetchPlants();
-    fetchLocations();
-    fetchSummary();
-    setNewPlant({ name: '', type: '', wateringFrequencyDays: 7, location: '', goodForTerrariums: false });
+    console.log('Attempting to add plant:', newPlant);
+    if (!newPlant.name) {
+      showError('Please enter a name for the plant.');
+      return;
+    }
+    try {
+      const response = await axios.post('/api/plants', newPlant);
+      console.log('Server response:', response.data);
+      setOpenAdd(false);
+      await fetchPlants();
+      await fetchLocations();
+      await fetchSummary();
+      setNewPlant({ name: '', type: '', wateringFrequencyDays: 7, location: '', goodForTerrariums: false, status: 'Active' });
+    } catch (error: any) {
+      console.error('Add plant failed:', error);
+      showError(`Failed to add plant: ${error.response?.data?.message || 'Check connection'}`);
+    }
   };
 
   const handleUpdatePlant = async () => {
@@ -194,10 +207,10 @@ function App() {
     }
   };
 
-  const handleViewDetails = async (id: number) => {
+  const handleViewDetails = async (id: number, tabIndex = 0) => {
     const res = await axios.get(`/api/plants/${id}`);
     setSelectedPlant(res.data);
-    setDetailTab(0);
+    setDetailTab(tabIndex);
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -206,7 +219,6 @@ function App() {
 
     const formData = new FormData();
     formData.append('file', file);
-    if (imageLabel) formData.append('label', imageLabel);
 
     try {
       if (uploadingToUpdateId) {
@@ -220,13 +232,25 @@ function App() {
         await axios.post(`/api/plants/updates/${updateRes.data.id}/images`, formData);
       }
       
-      handleViewDetails(selectedPlant.id);
+      handleViewDetails(selectedPlant.id, detailTab);
       fetchPlants(searchTerm);
-      setImageLabel('');
       setUploadingToUpdateId(null);
     } catch (error) { 
       console.error('Upload failed', error);
       showError('Upload failed. The image might be too large.');
+    }
+  };
+
+  const handleUpdateLabel = async () => {
+    if (!imageToLabel || !selectedPlant) return;
+    try {
+      await axios.put(`/api/plants/images/${imageToLabel.id}/label`, imageToLabel.label, {
+        headers: { 'Content-Type': 'text/plain' }
+      });
+      setLabelDialogOpen(false);
+      handleViewDetails(selectedPlant.id, detailTab);
+    } catch (error) {
+      showError('Failed to update label.');
     }
   };
 
@@ -236,8 +260,8 @@ function App() {
       await axios.post(`/api/plants/${selectedPlant.id}/updates`, newUpdate);
       setUpdateDialogOpen(false);
       setNewUpdate({ date: new Date().toISOString().split('T')[0], notes: '' });
-      handleViewDetails(selectedPlant.id);
-    } catch (error) {
+      handleViewDetails(selectedPlant.id, 1); // Switch to History tab after adding
+    } catch (error: any) {
       showError('Failed to add update.');
     }
   };
@@ -248,15 +272,36 @@ function App() {
       await axios.put(`/api/plants/images/${imageId}/rotation`, nextRotation, {
         headers: { 'Content-Type': 'application/json' }
       });
-      if (selectedPlant) handleViewDetails(selectedPlant.id);
+      if (selectedPlant) handleViewDetails(selectedPlant.id, detailTab);
     } catch (error) {
       showError('Failed to rotate image.');
     }
   };
 
+  const handleRotateMain = async (plantId: number, currentRotation: number) => {
+    const nextRotation = (currentRotation + 90) % 360;
+    try {
+      await axios.put(`/api/plants/${plantId}/rotation`, nextRotation, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+      handleViewDetails(plantId, 0);
+      fetchPlants(searchTerm);
+    } catch (error) {
+      showError('Failed to rotate cover photo.');
+    }
+  };
+
+  const handleSetCover = async (plantId: number, imageId: number) => {
+    try {
+      await axios.post(`/api/plants/${plantId}/cover/${imageId}`);
+      handleViewDetails(plantId, 0); // Jump back to Info to see the result
+      fetchPlants(searchTerm);
+    } catch (error) {
+      showError('Failed to set cover photo.');
+    }
+  };
+
   const triggerUpdateUpload = (updateId: number) => {
-    const label = prompt('Enter a label for this photo (e.g., Top View, Side View):') || '';
-    setImageLabel(label);
     setUploadingToUpdateId(updateId);
     fileInputRef.current?.click();
   };
@@ -356,13 +401,19 @@ function App() {
                       <img 
                         src={`/uploads/thumb_${plant.imagePath}?t=${new Date().getTime()}`} 
                         alt={plant.name} 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} 
-                        onClick={() => setFullImage(plant.imagePath)}
+                        style={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          objectFit: 'cover', 
+                          cursor: 'pointer',
+                          transform: `rotate(${plant.rotation || 0}deg)` 
+                        }} 
+                        onClick={() => setFullImage({ images: [{path: plant.imagePath, rotation: plant.rotation || 0}], index: 0 })}
                       />
                       <IconButton 
                         size="small" 
                         sx={{ position: 'absolute', bottom: 8, right: 8, bgcolor: 'rgba(255,255,255,0.7)', '&:hover': { bgcolor: 'white' } }}
-                        onClick={() => setFullImage(plant.imagePath)}
+                        onClick={() => setFullImage({ images: [{path: plant.imagePath, rotation: plant.rotation || 0}], index: 0 })}
                       >
                         <Search size={14} />
                       </IconButton>
@@ -426,7 +477,7 @@ function App() {
             <DialogContent sx={{ minHeight: 500 }}>
               <Tabs value={detailTab} onChange={(_, v) => setDetailTab(v)} sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }} variant="scrollable" scrollButtons="auto">
                 <Tab label="Info" icon={<Info size={16} />} iconPosition="start" />
-                <Tab label="Timeline" icon={<History size={16} />} iconPosition="start" />
+                <Tab label="History & Gallery" icon={<History size={16} />} iconPosition="start" />
                 <Tab label="Care" icon={<Settings size={16} />} iconPosition="start" />
                 <Tab label="Propagation" icon={<Scissors size={16} />} iconPosition="start" />
                 <Tab label="Lineage" icon={<Sprout size={16} />} iconPosition="start" />
@@ -441,10 +492,17 @@ function App() {
                         <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
                           <img 
                             src={`/uploads/thumb_${selectedPlant.imagePath}?t=${new Date().getTime()}`} 
-                            style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} 
-                            onClick={() => setFullImage({path: selectedPlant.imagePath, rotation: 0})}
+                            style={{ 
+                              width: '100%', 
+                              height: '100%', 
+                              objectFit: 'cover', 
+                              cursor: 'pointer',
+                              transform: `rotate(${selectedPlant.rotation || 0}deg)` 
+                            }} 
+                            onClick={() => setFullImage({ images: [{path: selectedPlant.imagePath, rotation: selectedPlant.rotation || 0}], index: 0 })}
                           />
                           <Box sx={{ position: 'absolute', bottom: 8, right: 8, display: 'flex', gap: 1 }}>
+                            <IconButton size="small" sx={{ bgcolor: 'white', '&:hover': { bgcolor: '#eee' } }} onClick={() => handleRotateMain(selectedPlant.id, selectedPlant.rotation || 0)}><RotateCw size={14} /></IconButton>
                             <Button size="small" variant="contained" startIcon={<History size={14} />} onClick={() => setDetailTab(1)} sx={{ fontSize: '0.7rem' }}>View History</Button>
                           </Box>
                         </Box>
@@ -472,7 +530,7 @@ function App() {
               {detailTab === 1 && (
                 <Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Growth Timeline</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>History & Photos</Typography>
                     <Button variant="contained" startIcon={<Plus size={18} />} onClick={() => setUpdateDialogOpen(true)}>Add Day</Button>
                   </Box>
                   
@@ -488,13 +546,16 @@ function App() {
                         <Typography variant="body2" sx={{ mb: 2, whiteSpace: 'pre-wrap' }}>{update.notes || 'No notes for this day.'}</Typography>
                         
                         <Grid container spacing={1}>
-                          {update.images?.map((img) => (
+                          {update.images?.map((img, idx) => (
                             <Grid item xs={4} sm={3} key={img.id}>
                               <Box sx={{ position: 'relative', pt: '100%', borderRadius: 1, overflow: 'hidden', border: '1px solid #eee' }}>
                                 <img 
                                   src={`/uploads/thumb_${img.imagePath}`} 
                                   style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', transform: `rotate(${img.rotation}deg)`, cursor: 'pointer' }}
-                                  onClick={() => setFullImage({path: img.imagePath, rotation: img.rotation})}
+                                  onClick={() => setFullImage({ 
+                                    images: update.images.map(i => ({ path: i.imagePath, rotation: i.rotation, label: i.label })), 
+                                    index: idx 
+                                  })}
                                 />
                                 <IconButton 
                                   size="small" 
@@ -503,11 +564,22 @@ function App() {
                                 >
                                   <RotateCw size={12} />
                                 </IconButton>
-                                {img.label && (
-                                  <Typography variant="caption" sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, bgcolor: 'rgba(0,0,0,0.5)', color: 'white', px: 0.5, fontSize: '0.6rem' }}>
-                                    {img.label}
+                                <IconButton 
+                                  size="small" 
+                                  sx={{ position: 'absolute', top: 2, left: 2, bgcolor: 'rgba(255,255,255,0.8)', p: 0.5, color: selectedPlant.imagePath === img.imagePath ? 'primary.main' : 'inherit' }}
+                                  onClick={() => handleSetCover(selectedPlant.id, img.id)}
+                                >
+                                  <Check size={12} />
+                                </IconButton>
+                                <Box 
+                                  sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, bgcolor: 'rgba(0,0,0,0.5)', color: 'white', px: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                                  onClick={() => { setImageToLabel({id: img.id, label: img.label || ''}); setLabelDialogOpen(true); }}
+                                >
+                                  <Typography variant="caption" sx={{ fontSize: '0.6rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {img.label || 'No Label'}
                                   </Typography>
-                                )}
+                                  <Settings size={10} />
+                                </Box>
                               </Box>
                             </Grid>
                           ))}
@@ -657,43 +729,130 @@ function App() {
 
       {/* Lightbox for Original Images */}
       <Dialog open={Boolean(fullImage)} onClose={() => setFullImage(null)} maxWidth="lg" fullWidth>
-        <Box sx={{ position: 'relative', bgcolor: 'black', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh' }}>
+        <Box sx={{ position: 'relative', bgcolor: 'black', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
           <IconButton 
             onClick={() => setFullImage(null)} 
-            sx={{ position: 'absolute', top: 8, right: 8, color: 'white', bgcolor: 'rgba(0,0,0,0.5)', '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' } }}
+            sx={{ position: 'absolute', top: 8, right: 8, color: 'white', bgcolor: 'rgba(0,0,0,0.5)', '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' }, zIndex: 10 }}
           >
-            <Plus style={{ transform: 'rotate(45deg)' }} />
+            <X size={20} />
           </IconButton>
+
+          {fullImage && fullImage.images.length > 1 && (
+            <>
+              <IconButton 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const nextIndex = (fullImage.index - 1 + fullImage.images.length) % fullImage.images.length;
+                  setFullImage({ ...fullImage, index: nextIndex });
+                }}
+                sx={{ 
+                  position: 'absolute', 
+                  left: { xs: 4, sm: 24 }, 
+                  color: 'white', 
+                  bgcolor: 'rgba(255,255,255,0.1)', 
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' },
+                  zIndex: 20 
+                }}
+              >
+                <ChevronLeft size={48} />
+              </IconButton>
+              <IconButton 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const nextIndex = (fullImage.index + 1) % fullImage.images.length;
+                  setFullImage({ ...fullImage, index: nextIndex });
+                }}
+                sx={{ 
+                  position: 'absolute', 
+                  right: { xs: 4, sm: 24 }, 
+                  color: 'white', 
+                  bgcolor: 'rgba(255,255,255,0.1)', 
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' },
+                  zIndex: 20 
+                }}
+              >
+                <ChevronRight size={48} />
+              </IconButton>
+            </>
+          )}
+
           {fullImage && (
-            <img 
-              src={`/uploads/original_${fullImage}`} 
-              alt="Full view" 
-              style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain' }} 
-            />
+            <Box sx={{ textAlign: 'center', width: '100%', px: { xs: 8, sm: 12 } }}>
+              <img 
+                src={`/uploads/original_${fullImage.images[fullImage.index].path}`} 
+                alt="Full view" 
+                style={{ 
+                  maxWidth: '100%', 
+                  maxHeight: '80vh', 
+                  objectFit: 'contain', 
+                  transform: `rotate(${fullImage.images[fullImage.index].rotation}deg)`,
+                  transition: 'transform 0.3s ease',
+                  boxShadow: '0 0 20px rgba(0,0,0,0.5)'
+                }} 
+              />
+              <Box sx={{ position: 'absolute', bottom: 16, left: 0, right: 0, color: 'white', textAlign: 'center' }}>
+                <Typography variant="subtitle1" sx={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+                  {fullImage.images[fullImage.index].label || 'Untitled Photo'}
+                </Typography>
+                {fullImage.images.length > 1 && (
+                  <Typography variant="caption" sx={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)', opacity: 0.8 }}>
+                    {fullImage.index + 1} of {fullImage.images.length}
+                  </Typography>
+                )}
+              </Box>
+            </Box>
           )}
         </Box>
       </Dialog>
 
       {/* Add Update Day Dialog */}
       <Dialog open={updateDialogOpen} onClose={() => setUpdateDialogOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>Add Daily Update</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <History color="#2e7d32" />
+          Add Daily Growth Entry
+        </DialogTitle>
         <DialogContent>
+          <Typography variant="caption" color="textSecondary" sx={{ mb: 2, display: 'block' }}>
+            Record today's progress, notes, and photos for your plant.
+          </Typography>
           <TextField 
-            fullWidth label="Date" type="date" sx={{ mt: 1 }}
+            fullWidth label="Entry Date" type="date" sx={{ mt: 1 }}
             InputLabelProps={{ shrink: true }}
             value={newUpdate.date}
             onChange={(e) => setNewUpdate({...newUpdate, date: e.target.value})}
+            size="small"
           />
           <TextField 
-            fullWidth label="Notes" multiline rows={4} sx={{ mt: 2 }}
-            placeholder="How is the plant doing today?"
+            fullWidth label="Growth Notes" multiline rows={4} sx={{ mt: 3 }}
+            placeholder="How is the plant doing today? Any new leaves or roots?"
             value={newUpdate.notes}
             onChange={(e) => setNewUpdate({...newUpdate, notes: e.target.value})}
           />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setUpdateDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleAddUpdate} variant="contained">Save Entry</Button>
+          <Button onClick={() => setUpdateDialogOpen(false)} color="inherit">Cancel</Button>
+          <Button onClick={handleAddUpdate} variant="contained" color="primary">Save Growth Day</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Photo Label Dialog */}
+      <Dialog open={labelDialogOpen} onClose={() => setLabelDialogOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle sx={{ fontWeight: 'bold' }}>Edit Photo Label</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+            Provide a short label for this photo (e.g., "Top Down", "New Leaf").
+          </Typography>
+          <TextField 
+            fullWidth label="Photo Label" autoFocus sx={{ mt: 1 }}
+            value={imageToLabel?.label || ''}
+            onChange={(e) => setImageToLabel({...imageToLabel!, label: e.target.value})}
+            placeholder="e.g. Side view"
+            size="small"
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setLabelDialogOpen(false)} color="inherit">Cancel</Button>
+          <Button onClick={handleUpdateLabel} variant="contained" color="primary">Update Label</Button>
         </DialogActions>
       </Dialog>
 

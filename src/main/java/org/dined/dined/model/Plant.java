@@ -66,6 +66,9 @@ public class Plant {
     private String totalPropagationTime; // Could be calculated, storing as string for now
     
     private String imagePath;
+    
+    @Builder.Default
+    private Integer rotation = 0;
 
     @PrePersist
     @PreUpdate

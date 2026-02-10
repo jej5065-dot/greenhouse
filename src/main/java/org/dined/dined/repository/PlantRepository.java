@@ -17,7 +17,10 @@ public interface PlantRepository extends JpaRepository<Plant, Long> {
     @Query("SELECT p FROM Plant p WHERE " +
            "CAST(p.id AS string) LIKE %:searchTerm% OR " +
            "p.guid LIKE %:searchTerm% OR " +
-           "LOWER(p.name) LIKE LOWER(concat('%', :searchTerm, '%'))")
+           "LOWER(p.name) LIKE LOWER(concat('%', :searchTerm, '%')) OR " +
+           "LOWER(p.status) LIKE LOWER(concat('%', :searchTerm, '%')) OR " +
+           "LOWER(p.type) LIKE LOWER(concat('%', :searchTerm, '%')) OR " +
+           "LOWER(p.location) LIKE LOWER(concat('%', :searchTerm, '%'))")
     List<Plant> search(@Param("searchTerm") String searchTerm);
 
     List<Plant> findByStatus(String status);

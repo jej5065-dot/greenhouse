@@ -98,6 +98,23 @@ public class PlantController {
         return plantService.updateImageRotation(imageId, rotation);
     }
 
+    @PutMapping("/images/{imageId}/label")
+    public PlantImage updateLabel(@PathVariable Long imageId, @RequestBody String label) {
+        return plantService.updateImageLabel(imageId, label);
+    }
+
+    @PostMapping("/{id}/cover/{imageId}")
+    public Plant setCoverImage(@PathVariable Long id, @PathVariable Long imageId) {
+        return plantService.setPlantCoverImage(id, imageId);
+    }
+
+    @PutMapping("/{id}/rotation")
+    public Plant updatePlantRotation(@PathVariable Long id, @RequestBody Integer rotation) {
+        Plant plant = plantService.getPlantById(id);
+        plant.setRotation(rotation);
+        return plantService.savePlant(plant);
+    }
+
     @PostMapping("/upload")
     public ResponseEntity<String> uploadImage(@RequestParam("file") MultipartFile file) throws IOException {
         String filename = plantService.saveImage(file);
