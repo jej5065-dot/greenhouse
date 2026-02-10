@@ -17,7 +17,7 @@ import ReactQuill from 'react-quill'
 import 'react-quill/dist/quill.snow.css'
 import { 
   RotateCw, MessageSquare, History, Check, X, Camera as CameraIcon,
-  Image as GalleryIcon, ChevronLeft, ChevronRight, FileUp, ShieldAlert
+  Image as GalleryIcon, ChevronLeft, ChevronRight, FileUp, Skull
 } from 'lucide-react'
 
 interface PlantType {
@@ -345,6 +345,13 @@ function App() {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
   };
 
+  const getToxicityColor = (toxicity?: string) => {
+    if (!toxicity || toxicity.toLowerCase().includes('safe') || toxicity.toLowerCase().includes('fine')) return null;
+    const t = toxicity.toLowerCase();
+    if (t.includes('heart') || t.includes('severe') || t.includes('death')) return '#d32f2f'; // Dangerous Red
+    return '#ffc107'; // Warning Yellow/Amber
+  };
+
   return (
     <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: 'background.default' }}>
       <input type="file" accept="image/*" style={{ display: 'none' }} ref={fileInputRef} onChange={handleFileUpload} />
@@ -472,9 +479,9 @@ function App() {
                     <Typography variant="caption" color="textSecondary" sx={{ fontWeight: 500 }}>
                       #{plant.id} • {plant.plantType?.name || 'Unknown Type'}
                     </Typography>
-                    {plant.plantType?.petToxicity && (
-                      <Tooltip title={`Toxicity: ${plant.plantType.petToxicity}`}>
-                        <ShieldAlert size={14} color="#d32f2f" />
+                    {getToxicityColor(plant.plantType?.petToxicity) && (
+                      <Tooltip title={`Toxicity: ${plant.plantType?.petToxicity}`}>
+                        <Skull size={14} color={getToxicityColor(plant.plantType?.petToxicity) || '#999'} />
                       </Tooltip>
                     )}
                   </Box>
@@ -619,8 +626,11 @@ function App() {
                     </Grid>
 
                     <Grid item xs={12}>
-                      <Box sx={{ p: 2, bgcolor: selectedPlant.plantType?.petToxicity?.toLowerCase().includes('safe') ? '#f1f8e9' : '#fff3e0', borderRadius: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <ShieldAlert color={selectedPlant.plantType?.petToxicity?.toLowerCase().includes('safe') ? '#2e7d32' : '#ed6c02'} />
+                      <Box sx={{ p: 2, bgcolor: !getToxicityColor(selectedPlant.plantType?.petToxicity) ? '#f1f8e9' : (getToxicityColor(selectedPlant.plantType?.petToxicity) === '#d32f2f' ? '#fdecea' : '#fffde7'), borderRadius: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                        {getToxicityColor(selectedPlant.plantType?.petToxicity) ? 
+                          <Skull color={getToxicityColor(selectedPlant.plantType?.petToxicity) || '#999'} /> : 
+                          <Check color="#2e7d32" />
+                        }
                         <Box>
                           <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Pet Toxicity</Typography>
                           <Typography variant="body2">{selectedPlant.plantType?.petToxicity || 'Toxicity information not available.'}</Typography>

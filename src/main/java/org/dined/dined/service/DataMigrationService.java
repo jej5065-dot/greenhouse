@@ -75,7 +75,10 @@ public class DataMigrationService {
 
             // 3. Migrate imagePath to Timeline (if not already there)
             if (plant.getImagePath() != null && !plant.getImagePath().isEmpty()) {
-                if (plant.getUpdates().isEmpty()) {
+                Integer updateCount = jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM plant_update WHERE plant_id = ?", Integer.class, plant.getId());
+                
+                if (updateCount == null || updateCount == 0) {
                     PlantUpdate initialUpdate = PlantUpdate.builder()
                             .date(LocalDate.now())
                             .notes("Initial photo from migration")
