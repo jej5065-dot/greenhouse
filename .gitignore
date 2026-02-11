@@ -41,3 +41,8 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+/uploads/*
+/backend.log
+/frontend.log
+/greenhouse.db
+/static-server.log
