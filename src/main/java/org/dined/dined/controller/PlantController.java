@@ -96,6 +96,18 @@ public class PlantController {
         return plantService.addImageToUpdate(updateId, file, label);
     }
 
+    @DeleteMapping("/updates/{updateId}")
+    public ResponseEntity<?> deleteUpdate(@PathVariable Long updateId) {
+        plantService.deleteUpdate(updateId);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/images/{imageId}")
+    public ResponseEntity<?> deleteImage(@PathVariable Long imageId) {
+        plantService.deleteImage(imageId);
+        return ResponseEntity.ok().build();
+    }
+
     @PutMapping("/images/{imageId}/rotation")
     public PlantImage updateRotation(@PathVariable Long imageId, @RequestBody Integer rotation) {
         return plantService.updateImageRotation(imageId, rotation);

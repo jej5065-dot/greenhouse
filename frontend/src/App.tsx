@@ -18,7 +18,7 @@ import 'react-quill/dist/quill.snow.css'
 import { 
   RotateCw, MessageSquare, History, Check, X, Camera as CameraIcon,
   Image as GalleryIcon, ChevronLeft, ChevronRight, FileUp, Skull,
-  Download, RefreshCw
+  Download, RefreshCw, Trash2 as TrashIcon
 } from 'lucide-react'
 
 interface PlantType {
@@ -98,6 +98,8 @@ function App() {
   const [fullImage, setFullImage] = useState<{ images: {path: string, rotation: number, label?: string}[], index: number } | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [plantToDelete, setPlantToDelete] = useState<number | null>(null);
+  const [deleteUpdateConfirmOpen, setDeleteUpdateConfirmOpen] = useState(false);
+  const [updateToDelete, setUpdateToDelete] = useState<PlantUpdate | null>(null);
   const [errorOpen, setErrorOpen] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [errorSeverity, setErrorSeverity] = useState<'error' | 'warning' | 'info' | 'success'>('error');
@@ -280,6 +282,37 @@ function App() {
   const triggerDelete = (id: number) => {
     setPlantToDelete(id);
     setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteUpdate = async (update: PlantUpdate) => {
+    if ((update.notes && update.notes.trim()) || (update.images && update.images.length > 0)) {
+      setUpdateToDelete(update);
+      setDeleteUpdateConfirmOpen(true);
+    } else {
+      executeDeleteUpdate(update.id);
+    }
+  };
+
+  const executeDeleteUpdate = async (id: number) => {
+    try {
+      await axios.delete(`/api/plants/updates/${id}`);
+      setDeleteUpdateConfirmOpen(false);
+      setUpdateToDelete(null);
+      if (selectedPlant) handleViewDetails(selectedPlant.id, 2);
+      fetchPlants(searchTerm);
+    } catch (error) {
+      showError('Failed to delete history entry.');
+    }
+  };
+
+  const handleDeleteImage = async (imageId: number) => {
+    try {
+      await axios.delete(`/api/plants/images/${imageId}`);
+      if (selectedPlant) handleViewDetails(selectedPlant.id, detailTab);
+      fetchPlants(searchTerm);
+    } catch (error) {
+      showError('Failed to delete image.');
+    }
   };
 
   const handleAddPlant = async () => {
@@ -856,6 +889,7 @@ function App() {
                           <Box>
                             <IconButton size="small" onClick={() => setEditingUpdate(update)}><Settings size={16} /></IconButton>
                             <IconButton size="small" onClick={() => triggerUpdateUpload(update.id)}><CameraIcon size={18} /></IconButton>
+                            <IconButton size="small" color="error" onClick={() => handleDeleteUpdate(update)}><TrashIcon size={16} /></IconButton>
                           </Box>
                         </Box>
                         <Typography variant="body2" sx={{ mb: 2, whiteSpace: 'pre-wrap' }}>{update.notes || 'No notes for this day.'}</Typography>
@@ -892,6 +926,13 @@ function App() {
                                   onClick={() => handleDownload(img.imagePath, img.label)}
                                 >
                                   <Download size={12} />
+                                </IconButton>
+                                <IconButton 
+                                  size="small" 
+                                  sx={{ position: 'absolute', top: 32, left: 2, bgcolor: 'rgba(255,255,255,0.8)', p: 0.5, color: '#d32f2f' }}
+                                  onClick={() => handleDeleteImage(img.id)}
+                                >
+                                  <TrashIcon size={12} />
                                 </IconButton>
                                 <Box 
                                   sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, bgcolor: 'rgba(0,0,0,0.5)', color: 'white', px: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
@@ -1275,6 +1316,26 @@ function App() {
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setLabelDialogOpen(false)} color="inherit">Cancel</Button>
           <Button onClick={handleUpdateLabel} variant="contained" color="primary">Update Label</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Update Confirmation Dialog */}
+      <Dialog open={deleteUpdateConfirmOpen} onClose={() => setDeleteUpdateConfirmOpen(false)} maxWidth="xs">
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <AlertCircle color="#ed6c02" /> 
+          Delete History Entry
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1">
+            This entry contains {updateToDelete?.notes ? 'notes' : ''} 
+            {updateToDelete?.notes && updateToDelete?.images?.length ? ' and ' : ''}
+            {updateToDelete?.images?.length ? `${updateToDelete.images.length} photo(s)` : ''}.
+            Are you sure you want to delete this entire growth day?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDeleteUpdateConfirmOpen(false)} color="inherit">Cancel</Button>
+          <Button onClick={() => updateToDelete && executeDeleteUpdate(updateToDelete.id)} variant="contained" color="error">Delete Entry</Button>
         </DialogActions>
       </Dialog>
 

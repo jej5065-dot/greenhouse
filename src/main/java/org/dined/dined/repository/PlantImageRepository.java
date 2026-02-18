@@ -6,4 +6,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface PlantImageRepository extends JpaRepository<PlantImage, Long> {
+    long countByImagePath(String imagePath);
 }

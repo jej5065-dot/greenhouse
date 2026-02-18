@@ -72,6 +72,58 @@ public class PlantService {
         plantRepository.deleteById(id);
     }
 
+    public void deleteUpdate(Long id) {
+        PlantUpdate update = updateRepository.findById(id).orElseThrow(() -> new RuntimeException("Update not found"));
+        // Remove images associated with this update
+        for (PlantImage image : update.getImages()) {
+            deleteImage(image.getId());
+        }
+        updateRepository.deleteById(id);
+    }
+
+    public void deleteImage(Long id) {
+        PlantImage image = imageRepository.findById(id).orElseThrow(() -> new RuntimeException("Image not found"));
+        String path = image.getImagePath();
+        
+        // Check if other records use this same physical file before deleting from disk
+        long count = imageRepository.countByImagePath(path);
+        
+        imageRepository.delete(image);
+
+        // If this was the plant's cover photo, we might want to clear it or pick another one
+        Plant plant = image.getUpdate().getPlant();
+        if (path.equals(plant.getImagePath())) {
+            // Find another image for this plant if available
+            updateRepository.findByPlantIdOrderByDateDesc(plant.getId()).stream()
+                .flatMap(u -> u.getImages().stream())
+                .filter(img -> !img.getId().equals(id))
+                .findFirst()
+                .ifPresentOrElse(
+                    nextImg -> {
+                        plant.setImagePath(nextImg.getImagePath());
+                        plant.setRotation(nextImg.getRotation());
+                        plantRepository.save(plant);
+                    },
+                    () -> {
+                        plant.setImagePath(null);
+                        plant.setRotation(0);
+                        plantRepository.save(plant);
+                    }
+                );
+        }
+
+        // Only delete file if no other records are using it
+        if (count <= 1) {
+            try {
+                Files.deleteIfExists(this.root.resolve("original_" + path));
+                Files.deleteIfExists(this.root.resolve("thumb_" + path));
+            } catch (IOException e) {
+                // Log but don't fail the transaction
+                System.err.println("Could not delete image file: " + path);
+            }
+        }
+    }
+
     public Plant waterPlant(Long id) {
         Plant plant = getPlantById(id);
         plant.setLastWateredDate(LocalDateTime.now());
