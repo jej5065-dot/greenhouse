@@ -83,6 +83,11 @@ public class PlantController {
         return plantService.addUpdate(id, update);
     }
 
+    @PutMapping("/updates/{updateId}")
+    public PlantUpdate updateUpdate(@PathVariable Long updateId, @RequestBody PlantUpdate update) {
+        return plantService.updateUpdate(updateId, update);
+    }
+
     @PostMapping("/updates/{updateId}/images")
     public PlantImage addImageToUpdate(
             @PathVariable Long updateId, 

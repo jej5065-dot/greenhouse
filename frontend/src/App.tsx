@@ -101,6 +101,9 @@ function App() {
   const [uploadingToUpdateId, setUploadingToUpdateId] = useState<number | null>(null);
   const [labelDialogOpen, setLabelDialogOpen] = useState(false);
   const [imageToLabel, setImageToLabel] = useState<{id: number, label: string} | null>(null);
+  
+  // New: State for editing an existing entry
+  const [editingUpdate, setEditingUpdate] = useState<PlantUpdate | null>(null);
 
   const [newPlant, setNewPlant] = useState<Partial<Plant>>({ 
     name: '', wateringFrequencyDays: 7, location: '',
@@ -289,9 +292,48 @@ function App() {
       await axios.post(`/api/plants/${selectedPlant.id}/updates`, newUpdate);
       setUpdateDialogOpen(false);
       setNewUpdate({ date: new Date().toISOString().split('T')[0], notes: '' });
-      handleViewDetails(selectedPlant.id, 1); // Switch to History tab after adding
+      handleViewDetails(selectedPlant.id, 2); // Switch to History tab (index 2)
     } catch (error: any) {
       showError('Failed to add update.');
+    }
+  };
+
+  const handleEditUpdate = async () => {
+    if (!editingUpdate || !selectedPlant) return;
+    try {
+      await axios.put(`/api/plants/updates/${editingUpdate.id}`, {
+        date: editingUpdate.date,
+        notes: editingUpdate.notes
+      });
+      setEditingUpdate(null);
+      handleViewDetails(selectedPlant.id, 2);
+    } catch (error) {
+      showError('Failed to update entry.');
+    }
+  };
+
+  const addTodayAndUpload = async () => {
+    if (!selectedPlant) return;
+    try {
+      // Check if there is already an update for today
+      const today = new Date().toISOString().split('T')[0];
+      let updateId: number;
+      const existing = (selectedPlant.updates || []).find(u => u.date === today);
+      
+      if (existing) {
+        updateId = existing.id;
+      } else {
+        const res = await axios.post(`/api/plants/${selectedPlant.id}/updates`, { 
+          date: today, 
+          notes: '' 
+        });
+        updateId = res.data.id;
+      }
+      
+      setUploadingToUpdateId(updateId);
+      fileInputRef.current?.click();
+    } catch (error) {
+      showError('Failed to prepare for upload.');
     }
   };
 
@@ -562,9 +604,17 @@ function App() {
                           </Box>
                         </Box>
                       ) : (
-                        <Box sx={{ textAlign: 'center', color: 'text.secondary', cursor: 'pointer' }} onClick={() => setDetailTab(1)}>
+                        <Box sx={{ textAlign: 'center', color: 'text.secondary' }}>
                           <History size={32} />
-                          <Typography variant="caption" display="block">Add your first update in the Timeline</Typography>
+                          <Typography variant="caption" display="block" sx={{ mb: 1 }}>No cover photo set</Typography>
+                          <Button 
+                            variant="outlined" 
+                            size="small" 
+                            startIcon={<CameraIcon size={14} />}
+                            onClick={() => addTodayAndUpload()}
+                          >
+                            Add First Photo
+                          </Button>
                         </Box>
                       )}
                     </Box>
@@ -643,19 +693,25 @@ function App() {
 
               {detailTab === 2 && (
                 <Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, alignItems: 'center' }}>
                     <Typography variant="h6" sx={{ fontWeight: 'bold' }}>History & Photos</Typography>
-                    <Button variant="contained" startIcon={<Plus size={18} />} onClick={() => setUpdateDialogOpen(true)}>Add Day</Button>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button variant="outlined" size="small" startIcon={<Calendar size={18} />} onClick={() => setUpdateDialogOpen(true)}>Backdate</Button>
+                      <Button variant="contained" size="small" startIcon={<CameraIcon size={18} />} onClick={addTodayAndUpload}>Add Today</Button>
+                    </Box>
                   </Box>
                   
                   {selectedPlant.updates?.map((update) => (
                     <Card key={update.id} sx={{ mb: 3, borderRadius: 2, bgcolor: '#fcfcfc' }}>
                       <CardContent>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, alignItems: 'center' }}>
                           <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
                             {new Date(update.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                           </Typography>
-                          <IconButton size="small" onClick={() => triggerUpdateUpload(update.id)}><CameraIcon size={18} /></IconButton>
+                          <Box>
+                            <IconButton size="small" onClick={() => setEditingUpdate(update)}><Settings size={16} /></IconButton>
+                            <IconButton size="small" onClick={() => triggerUpdateUpload(update.id)}><CameraIcon size={18} /></IconButton>
+                          </Box>
                         </Box>
                         <Typography variant="body2" sx={{ mb: 2, whiteSpace: 'pre-wrap' }}>{update.notes || 'No notes for this day.'}</Typography>
                         
@@ -950,6 +1006,30 @@ function App() {
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setUpdateDialogOpen(false)} color="inherit">Cancel</Button>
           <Button onClick={handleAddUpdate} variant="contained" color="primary">Save Growth Day</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit History Entry Dialog */}
+      <Dialog open={Boolean(editingUpdate)} onClose={() => setEditingUpdate(null)} fullWidth maxWidth="xs">
+        <DialogTitle sx={{ fontWeight: 'bold' }}>Edit History Entry</DialogTitle>
+        <DialogContent>
+          <TextField 
+            fullWidth label="Entry Date" type="date" sx={{ mt: 1 }}
+            InputLabelProps={{ shrink: true }}
+            value={editingUpdate?.date || ''}
+            onChange={(e) => setEditingUpdate(u => u ? {...u, date: e.target.value} : null)}
+            size="small"
+          />
+          <TextField 
+            fullWidth label="Notes" multiline rows={4} sx={{ mt: 3 }}
+            value={editingUpdate?.notes || ''}
+            onChange={(e) => setEditingUpdate(u => u ? {...u, notes: e.target.value} : null)}
+            size="small"
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setEditingUpdate(null)} color="inherit">Cancel</Button>
+          <Button onClick={handleEditUpdate} variant="contained" color="primary">Update Entry</Button>
         </DialogActions>
       </Dialog>
 

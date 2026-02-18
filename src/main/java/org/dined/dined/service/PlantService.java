@@ -102,6 +102,13 @@ public class PlantService {
         return updateRepository.save(update);
     }
 
+    public PlantUpdate updateUpdate(Long updateId, PlantUpdate updateData) {
+        PlantUpdate existing = updateRepository.findById(updateId).orElseThrow(() -> new RuntimeException("Update not found"));
+        existing.setDate(updateData.getDate());
+        existing.setNotes(updateData.getNotes());
+        return updateRepository.save(existing);
+    }
+
     public PlantImage addImageToUpdate(Long updateId, MultipartFile file, String label) throws IOException {
         PlantUpdate update = updateRepository.findById(updateId).orElseThrow(() -> new RuntimeException("Update not found"));
         String filename = saveImage(file);
