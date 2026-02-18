@@ -8,7 +8,7 @@ import {
 } from '@mui/material'
 import { 
   Droplet, Scissors, Search, Plus, Calendar, MapPin, 
-  AlertCircle, Image as ImageIcon, Trash2,
+  AlertCircle, AlertTriangle, Image as ImageIcon, Trash2,
   Camera, DollarSign, Sprout, Info, Settings, ArrowUpDown,
   ExternalLink
 } from 'lucide-react'
@@ -93,17 +93,34 @@ function App() {
   const [plantToDelete, setPlantToDelete] = useState<number | null>(null);
   const [errorOpen, setErrorOpen] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [errorSeverity, setErrorSeverity] = useState<'error' | 'warning' | 'info' | 'success'>('error');
   const [detailTab, setDetailTab] = useState(0);
+
+  const getLocalDateString = (date = new Date()) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getYesterdayDateString = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return getLocalDateString(d);
+  };
 
   // New Progression State
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
-  const [newUpdate, setNewUpdate] = useState({ date: new Date().toISOString().split('T')[0], notes: '' });
+  const [newUpdate, setNewUpdate] = useState({ date: getYesterdayDateString(), notes: '' });
   const [uploadingToUpdateId, setUploadingToUpdateId] = useState<number | null>(null);
   const [labelDialogOpen, setLabelDialogOpen] = useState(false);
   const [imageToLabel, setImageToLabel] = useState<{id: number, label: string} | null>(null);
   
   // New: State for editing an existing entry
   const [editingUpdate, setEditingUpdate] = useState<PlantUpdate | null>(null);
+  const [initialPlantFile, setInitialPlantFile] = useState<File | null>(null);
+  const [duplicateDayOpen, setDuplicateDayOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const [newPlant, setNewPlant] = useState<Partial<Plant>>({ 
     name: '', wateringFrequencyDays: 7, location: '',
@@ -178,7 +195,21 @@ function App() {
 
   const showError = (msg: string) => {
     setErrorMsg(msg);
+    setErrorSeverity('error');
     setErrorOpen(true);
+  };
+
+  const showWarning = (msg: string) => {
+    setErrorMsg(msg);
+    setErrorSeverity('warning');
+    setErrorOpen(true);
+  };
+
+  const formatDisplayDate = (dateStr: string) => {
+    // Manually parse YYYY-MM-DD to avoid timezone shifting
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   };
 
   const handleDelete = async () => {
@@ -202,22 +233,57 @@ function App() {
   };
 
   const handleAddPlant = async () => {
-    console.log('Attempting to add plant:', newPlant);
     if (!newPlant.name) {
       showError('Please enter a name for the plant.');
       return;
     }
+    setIsProcessing(true);
     try {
-      const response = await axios.post('/api/plants', newPlant);
-      console.log('Server response:', response.data);
+      const plantData = { ...newPlant };
+      
+      // freeSolo Autocomplete can return a string or an object
+      if (typeof plantData.plantType === 'string') {
+        plantData.plantType = { name: plantData.plantType } as any;
+      } else if (plantData.plantType && (plantData.plantType as any).name) {
+        // Just send the essential fields to avoid circularity/bloat
+        plantData.plantType = {
+          id: (plantData.plantType as any).id,
+          name: (plantData.plantType as any).name
+        } as any;
+      }
+
+      console.log('Posting plant data:', plantData);
+      const response = await axios.post('/api/plants', plantData);
+      const createdPlant = response.data;
+      console.log('Plant created:', createdPlant);
+      
+      if (initialPlantFile) {
+        console.log('Uploading initial image for plant:', createdPlant.id);
+        const updateRes = await axios.post(`/api/plants/${createdPlant.id}/updates`, { 
+          date: getLocalDateString(), 
+          notes: 'Initial photo' 
+        });
+        console.log('Update entry created:', updateRes.data);
+        
+        const formData = new FormData();
+        formData.append('file', initialPlantFile);
+        await axios.post(`/api/plants/updates/${updateRes.data.id}/images`, formData);
+        console.log('Image uploaded successfully');
+      }
+
       setOpenAdd(false);
+      setInitialPlantFile(null);
       await fetchPlants();
       await fetchLocations();
       await fetchSummary();
       setNewPlant({ name: '', wateringFrequencyDays: 7, location: '', goodForTerrariums: false, status: 'Active' });
+      handleViewDetails(createdPlant.id);
     } catch (error: any) {
-      console.error('Add plant failed:', error);
-      showError(`Failed to add plant: ${error.response?.data?.message || 'Check connection'}`);
+      console.error('Add plant failed details:', error);
+      const msg = error.response?.data?.message || error.message || 'Server error';
+      showError(`Failed to add plant: ${msg}`);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -258,7 +324,7 @@ function App() {
       } else {
         // Create a default update for "today" if uploading from main view
         const updateRes = await axios.post(`/api/plants/${selectedPlant.id}/updates`, { 
-          date: new Date().toISOString().split('T')[0], 
+          date: getLocalDateString(), 
           notes: 'Photo added' 
         });
         await axios.post(`/api/plants/updates/${updateRes.data.id}/images`, formData);
@@ -288,10 +354,23 @@ function App() {
 
   const handleAddUpdate = async () => {
     if (!selectedPlant) return;
+
+    const today = getLocalDateString();
+    if (newUpdate.date > today) {
+      showError('You cannot log entries for future dates.');
+      return;
+    }
+
+    const existing = (selectedPlant.updates || []).find(u => u.date === newUpdate.date);
+    if (existing) {
+      showWarning(`An entry for this date already exists. You can add more photos to the existing day in the timeline.`);
+      return;
+    }
+
     try {
       await axios.post(`/api/plants/${selectedPlant.id}/updates`, newUpdate);
       setUpdateDialogOpen(false);
-      setNewUpdate({ date: new Date().toISOString().split('T')[0], notes: '' });
+      setNewUpdate({ date: getYesterdayDateString(), notes: '' });
       handleViewDetails(selectedPlant.id, 2); // Switch to History tab (index 2)
     } catch (error: any) {
       showError('Failed to add update.');
@@ -312,14 +391,20 @@ function App() {
     }
   };
 
-  const addTodayAndUpload = async () => {
-    if (!selectedPlant) return;
+  const addTodayAndUpload = async (force = false) => {
+    if (!selectedPlant || isProcessing) return;
+    
+    const today = getLocalDateString();
+    const existing = (selectedPlant.updates || []).find(u => u.date === today);
+
+    if (existing && !force) {
+      setDuplicateDayOpen(true);
+      return;
+    }
+
+    setIsProcessing(true);
     try {
-      // Check if there is already an update for today
-      const today = new Date().toISOString().split('T')[0];
       let updateId: number;
-      const existing = (selectedPlant.updates || []).find(u => u.date === today);
-      
       if (existing) {
         updateId = existing.id;
       } else {
@@ -328,12 +413,16 @@ function App() {
           notes: '' 
         });
         updateId = res.data.id;
+        // Refresh details immediately so the new day shows up
+        await handleViewDetails(selectedPlant.id, 2);
       }
       
       setUploadingToUpdateId(updateId);
       fileInputRef.current?.click();
     } catch (error) {
       showError('Failed to prepare for upload.');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -697,7 +786,7 @@ function App() {
                     <Typography variant="h6" sx={{ fontWeight: 'bold' }}>History & Photos</Typography>
                     <Box sx={{ display: 'flex', gap: 1 }}>
                       <Button variant="outlined" size="small" startIcon={<Calendar size={18} />} onClick={() => setUpdateDialogOpen(true)}>Backdate</Button>
-                      <Button variant="contained" size="small" startIcon={<CameraIcon size={18} />} onClick={addTodayAndUpload}>Add Today</Button>
+                      <Button variant="contained" size="small" startIcon={<CameraIcon size={18} />} onClick={() => addTodayAndUpload()}>Add Today</Button>
                     </Box>
                   </Box>
                   
@@ -706,7 +795,7 @@ function App() {
                       <CardContent>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, alignItems: 'center' }}>
                           <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                            {new Date(update.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                            {formatDisplayDate(update.date)}
                           </Typography>
                           <Box>
                             <IconButton size="small" onClick={() => setEditingUpdate(update)}><Settings size={16} /></IconButton>
@@ -894,10 +983,36 @@ function App() {
             renderInput={(p) => <TextField {...p} label="Plant Type" size="small" />} 
           />
           <Autocomplete freeSolo options={locations} value={newPlant.location} onInputChange={(_, n) => setNewPlant({...newPlant, location: n})} renderInput={(p) => <TextField {...p} label="Location" fullWidth sx={{ mt: 2 }} size="small" />} />
+          
+          <Box sx={{ mt: 3, p: 2, border: '1px dashed #ccc', borderRadius: 2, textAlign: 'center' }}>
+            {initialPlantFile ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                <Typography variant="body2" noWrap sx={{ maxWidth: 150 }}>{initialPlantFile.name}</Typography>
+                <IconButton size="small" color="error" onClick={() => setInitialPlantFile(null)}><X size={14} /></IconButton>
+              </Box>
+            ) : (
+              <Button 
+                variant="outlined" 
+                size="small" 
+                startIcon={<CameraIcon size={16} />} 
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = 'image/*';
+                  input.onchange = (e: any) => setInitialPlantFile(e.target.files[0]);
+                  input.click();
+                }}
+              >
+                Attach Initial Photo
+              </Button>
+            )}
+          </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenAdd(false)}>Cancel</Button>
-          <Button onClick={handleAddPlant} variant="contained">Add</Button>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setOpenAdd(false)} color="inherit">Cancel</Button>
+          <Button onClick={handleAddPlant} variant="contained" disabled={isProcessing}>
+            {isProcessing ? 'Adding...' : 'Add Plant'}
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -994,6 +1109,7 @@ function App() {
             InputLabelProps={{ shrink: true }}
             value={newUpdate.date}
             onChange={(e) => setNewUpdate({...newUpdate, date: e.target.value})}
+            inputProps={{ max: getLocalDateString() }}
             size="small"
           />
           <TextField 
@@ -1030,6 +1146,39 @@ function App() {
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setEditingUpdate(null)} color="inherit">Cancel</Button>
           <Button onClick={handleEditUpdate} variant="contained" color="primary">Update Entry</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Duplicate Day Prompt */}
+      <Dialog open={duplicateDayOpen} onClose={() => setDuplicateDayOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 'bold' }}>Entry Already Exists</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="textSecondary">
+            You've already added an entry for today. Would you like to add another photo to today's entry, or backdate a new one?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, flexDirection: 'column', gap: 1 }}>
+          <Button 
+            fullWidth 
+            variant="contained" 
+            onClick={() => {
+              setDuplicateDayOpen(false);
+              addTodayAndUpload(true);
+            }}
+          >
+            Add to Today's Entry
+          </Button>
+          <Button 
+            fullWidth 
+            variant="outlined" 
+            onClick={() => {
+              setDuplicateDayOpen(false);
+              setUpdateDialogOpen(true);
+            }}
+          >
+            Backdate a Different Day
+          </Button>
+          <Button fullWidth onClick={() => setDuplicateDayOpen(false)} color="inherit">Cancel</Button>
         </DialogActions>
       </Dialog>
 
@@ -1071,17 +1220,17 @@ function App() {
         </DialogActions>
       </Dialog>
 
-      {/* Error Dialog */}
-      <Dialog open={errorOpen} onClose={() => setErrorOpen(false)} maxWidth="xs">
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'error.main' }}>
-          <AlertCircle /> 
-          Oops! Something went wrong
+      {/* Error/Warning Dialog */}
+      <Dialog open={errorOpen} onClose={() => setErrorOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: errorSeverity === 'error' ? 'error.main' : 'warning.main', fontWeight: 'bold' }}>
+          {errorSeverity === 'error' ? <AlertCircle /> : <AlertTriangle />}
+          {errorSeverity === 'error' ? 'Oops! Something went wrong' : 'Note'}
         </DialogTitle>
         <DialogContent>
           <Typography variant="body1">{errorMsg}</Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setErrorOpen(false)} variant="contained" color="primary">Dismiss</Button>
+          <Button onClick={() => setErrorOpen(false)} variant="contained" color={errorSeverity === 'error' ? 'primary' : 'warning'}>Dismiss</Button>
         </DialogActions>
       </Dialog>
     </Box>
