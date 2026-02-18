@@ -18,7 +18,7 @@ import 'react-quill/dist/quill.snow.css'
 import { 
   RotateCw, MessageSquare, History, Check, X, Camera as CameraIcon,
   Image as GalleryIcon, ChevronLeft, ChevronRight, FileUp, Skull,
-  Download
+  Download, RefreshCw
 } from 'lucide-react'
 
 interface PlantType {
@@ -182,11 +182,33 @@ function App() {
     setSummary(res.data);
   };
 
+  const refreshAll = async () => {
+    setIsProcessing(true);
+    try {
+      await Promise.all([
+        fetchPlants(searchTerm),
+        fetchLocations(),
+        fetchPlantTypes(),
+        fetchSummary()
+      ]);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   useEffect(() => {
     fetchPlants();
     fetchLocations();
     fetchPlantTypes();
     fetchSummary();
+
+    // Auto-refresh every 60 seconds to keep multi-user sessions in sync
+    const interval = setInterval(() => {
+      fetchPlants(searchTerm);
+      fetchSummary();
+    }, 60000);
+    
+    return () => clearInterval(interval);
   }, [sortBy]);
 
   const handleCsvUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -517,6 +539,11 @@ function App() {
             Greenhouse
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Tooltip title="Refresh Data">
+              <IconButton color="inherit" onClick={refreshAll} disabled={isProcessing}>
+                <RefreshCw size={20} className={isProcessing ? 'animate-spin' : ''} />
+              </IconButton>
+            </Tooltip>
             <Tooltip title="Import Plant Library (CSV)">
               <IconButton color="inherit" onClick={() => csvInputRef.current?.click()}><FileUp size={20} /></IconButton>
             </Tooltip>
