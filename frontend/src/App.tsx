@@ -17,7 +17,8 @@ import ReactQuill from 'react-quill'
 import 'react-quill/dist/quill.snow.css'
 import { 
   RotateCw, MessageSquare, History, Check, X, Camera as CameraIcon,
-  Image as GalleryIcon, ChevronLeft, ChevronRight, FileUp, Skull
+  Image as GalleryIcon, ChevronLeft, ChevronRight, FileUp, Skull,
+  Download
 } from 'lucide-react'
 
 interface PlantType {
@@ -126,6 +127,27 @@ function App() {
     name: '', wateringFrequencyDays: 7, location: '',
     goodForTerrariums: false, status: 'Active'
   });
+
+  const handleDownload = async (path: string, label?: string) => {
+    try {
+      const url = `/uploads/original_${path}`;
+      const filename = label ? `${label.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png` : `plant_image_${path}`;
+      
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      showError('Failed to download image.');
+    }
+  };
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
@@ -688,6 +710,7 @@ function App() {
                             onClick={() => setFullImage({ images: [{path: selectedPlant.imagePath, rotation: selectedPlant.rotation || 0}], index: 0 })}
                           />
                           <Box sx={{ position: 'absolute', bottom: 8, right: 8, display: 'flex', gap: 1 }}>
+                            <IconButton size="small" sx={{ bgcolor: 'white', '&:hover': { bgcolor: '#eee' } }} onClick={() => handleDownload(selectedPlant.imagePath)}><Download size={14} /></IconButton>
                             <IconButton size="small" sx={{ bgcolor: 'white', '&:hover': { bgcolor: '#eee' } }} onClick={() => handleRotateMain(selectedPlant.id, selectedPlant.rotation || 0)}><RotateCw size={14} /></IconButton>
                             <Button size="small" variant="contained" startIcon={<History size={14} />} onClick={() => setDetailTab(1)} sx={{ fontSize: '0.7rem' }}>View History</Button>
                           </Box>
@@ -829,6 +852,13 @@ function App() {
                                   onClick={() => handleSetCover(selectedPlant.id, img.id)}
                                 >
                                   <Check size={12} />
+                                </IconButton>
+                                <IconButton 
+                                  size="small" 
+                                  sx={{ position: 'absolute', top: 32, right: 2, bgcolor: 'rgba(255,255,255,0.8)', p: 0.5 }}
+                                  onClick={() => handleDownload(img.imagePath, img.label)}
+                                >
+                                  <Download size={12} />
                                 </IconButton>
                                 <Box 
                                   sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, bgcolor: 'rgba(0,0,0,0.5)', color: 'white', px: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
@@ -1024,6 +1054,18 @@ function App() {
             sx={{ position: 'absolute', top: 8, right: 8, color: 'white', bgcolor: 'rgba(0,0,0,0.5)', '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' }, zIndex: 10 }}
           >
             <X size={20} />
+          </IconButton>
+
+          <IconButton 
+            onClick={() => {
+              if (fullImage) {
+                const img = fullImage.images[fullImage.index];
+                handleDownload(img.path, img.label);
+              }
+            }}
+            sx={{ position: 'absolute', top: 8, right: 56, color: 'white', bgcolor: 'rgba(0,0,0,0.5)', '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' }, zIndex: 10 }}
+          >
+            <Download size={20} />
           </IconButton>
 
           {fullImage && fullImage.images.length > 1 && (
