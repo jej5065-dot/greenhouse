@@ -83,8 +83,14 @@ function App() {
   const [locations, setLocations] = useState<string[]>([]);
   const [summary, setSummary] = useState<PlantSummary | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('nextWaterDate');
+  const [sortBy, setSortBy] = useState(localStorage.getItem('greenhouse_sort') || 'nextWaterDate');
   const [sortAnchor, setSortAnchor] = useState<null | HTMLElement>(null);
+
+  const handleSetSort = (val: string) => {
+    setSortBy(val);
+    localStorage.setItem('greenhouse_sort', val);
+    setSortAnchor(null);
+  };
   
   // Modals
   const [openAdd, setOpenAdd] = useState(false);
@@ -606,10 +612,10 @@ function App() {
             Sort: {sortBy === 'nextWaterDate' ? 'Urgency' : sortBy}
           </Button>
           <Menu anchorEl={sortAnchor} open={Boolean(sortAnchor)} onClose={() => setSortAnchor(null)}>
-            <MenuItem onClick={() => {setSortBy('nextWaterDate'); setSortAnchor(null)}}>Urgency (Watering)</MenuItem>
-            <MenuItem onClick={() => {setSortBy('id'); setSortAnchor(null)}}>Plant Number</MenuItem>
-            <MenuItem onClick={() => {setSortBy('name'); setSortAnchor(null)}}>Name</MenuItem>
-            <MenuItem onClick={() => {setSortBy('type'); setSortAnchor(null)}}>Type</MenuItem>
+            <MenuItem onClick={() => handleSetSort('nextWaterDate')}>Urgency (Watering)</MenuItem>
+            <MenuItem onClick={() => handleSetSort('id')}>Plant Number</MenuItem>
+            <MenuItem onClick={() => handleSetSort('name')}>Name</MenuItem>
+            <MenuItem onClick={() => handleSetSort('type')}>Type</MenuItem>
           </Menu>
         </Box>
 
