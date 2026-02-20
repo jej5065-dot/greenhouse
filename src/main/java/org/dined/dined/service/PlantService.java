@@ -25,11 +25,14 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
 @Service
 public class PlantService {
+
+    private static final List<String> ALLOWED_EXTENSIONS = Arrays.asList("jpg", "jpeg", "png", "gif", "webp");
 
     @Autowired
     private PlantRepository plantRepository;
@@ -223,6 +226,10 @@ public class PlantService {
             String originalFilename = file.getOriginalFilename();
             if (originalFilename != null && originalFilename.contains(".")) {
                 extension = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
+            }
+
+            if (!ALLOWED_EXTENSIONS.contains(extension)) {
+                throw new IllegalArgumentException("Invalid file extension: " + extension);
             }
             
             String hashedFilename = hexString.toString() + "." + extension;
