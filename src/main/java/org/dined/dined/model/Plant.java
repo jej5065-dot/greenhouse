@@ -33,17 +33,23 @@ public class Plant {
     @ManyToOne
     @JoinColumn(name = "parent_id")
     @JsonIgnoreProperties("children")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private Plant parent;
 
     @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
     @Builder.Default
     @JsonIgnoreProperties("parent")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private List<Plant> children = new ArrayList<>();
 
     @OneToMany(mappedBy = "plant", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     @OrderBy("date DESC")
     @JsonIgnoreProperties("plant")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private List<PlantUpdate> updates = new ArrayList<>();
 
     private LocalDate cuttingDate;
