@@ -47,7 +47,7 @@ public class PlantIntegrationTest {
         ResponseEntity<Plant> response = restTemplate.postForEntity("/api/plants", plant, Plant.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().getName()).isEqualTo("Test Monstera");
-        
+
         Long id = response.getBody().getId();
         ResponseEntity<Plant> getResponse = restTemplate.getForEntity("/api/plants/" + id, Plant.class);
         assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -98,7 +98,7 @@ public class PlantIntegrationTest {
 
         ResponseEntity<Object> response = restTemplate.getForEntity("/api/plants/summary", Object.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        
+
         // Check content as a Map
         java.util.Map<String, Object> summary = (java.util.Map<String, Object>) response.getBody();
         assertThat(summary.get("totalPlants")).isEqualTo(3);
