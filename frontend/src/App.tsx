@@ -20,6 +20,7 @@ import {
   Image as GalleryIcon, ChevronLeft, ChevronRight, FileUp, Skull,
   Download, RefreshCw, Trash2 as TrashIcon
 } from 'lucide-react'
+import DOMPurify from 'dompurify'
 
 interface PlantType {
   id: number;
@@ -964,7 +965,7 @@ function App() {
                   <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>Master Care Instructions</Typography>
                   <Typography variant="caption" color="textSecondary" sx={{ mb: 3, display: 'block' }}>Derived from {selectedPlant.plantType?.name || 'Unknown Type'}</Typography>
                   <Box sx={{ bgcolor: '#fafafa', p: 2, borderRadius: 2, border: '1px solid #eee' }}>
-                    <div dangerouslySetInnerHTML={{ __html: selectedPlant.plantType?.careInstructions || 'No care instructions in library.' }} />
+                    <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedPlant.plantType?.careInstructions || 'No care instructions in library.') }} />
                   </Box>
                 </Box>
               )}
@@ -974,7 +975,7 @@ function App() {
                   <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>Master Propagation Notes</Typography>
                   <Typography variant="caption" color="textSecondary" sx={{ mb: 3, display: 'block' }}>Derived from {selectedPlant.plantType?.name || 'Unknown Type'}</Typography>
                   <Box sx={{ bgcolor: '#fafafa', p: 2, borderRadius: 2, border: '1px solid #eee', mb: 3 }}>
-                    <div dangerouslySetInnerHTML={{ __html: selectedPlant.plantType?.propagationInstructions || 'No propagation notes in library.' }} />
+                    <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedPlant.plantType?.propagationInstructions || 'No propagation notes in library.') }} />
                   </Box>
                   <TextField fullWidth label="Total Propagation Time" value={selectedPlant.totalPropagationTime || ''} onChange={(e) => setSelectedPlant({...selectedPlant, totalPropagationTime: e.target.value})} size="small" placeholder="e.g. 4 weeks to root" />
                 </Box>
