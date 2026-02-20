@@ -1,5 +1,6 @@
 package org.dined.dined.scheduler;
 
+import lombok.extern.slf4j.Slf4j;
 import org.dined.dined.model.Plant;
 import org.dined.dined.repository.PlantRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.util.List;
 
+@Slf4j
 @Component
 public class PlantScheduler {
 
@@ -18,7 +20,7 @@ public class PlantScheduler {
     // Run every hour
     @Scheduled(fixedRate = 3600000) // 3600000 ms = 1 hour
     public void checkPlantStatus() {
-        System.out.println("Running scheduled plant status check...");
+        log.info("Running scheduled plant status check...");
         List<Plant> allPlants = plantRepository.findAll();
         LocalDate today = LocalDate.now();
 
@@ -27,10 +29,10 @@ public class PlantScheduler {
                 if (!"Needs Attention".equals(plant.getStatus())) {
                     plant.setStatus("Needs Attention");
                     plantRepository.save(plant);
-                    System.out.println("Updated plant " + plant.getName() + " (#" + plant.getId() + ") to 'Needs Attention'.");
+                    log.info("Updated plant {} (#{}) to 'Needs Attention'.", plant.getName(), plant.getId());
                 }
             }
         }
-        System.out.println("Plant status check complete.");
+        log.info("Plant status check complete.");
     }
 }
