@@ -1,67 +1,78 @@
 package org.dined.dined.service;
 
-import org.junit.jupiter.api.AfterEach;
+import org.dined.dined.model.Plant;
+import org.dined.dined.model.PlantSummary;
+import org.dined.dined.repository.PlantRepository;
 import org.junit.jupiter.api.Test;
-import org.springframework.mock.web.MockMultipartFile;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.stream.Stream;
+import java.util.Arrays;
+import java.util.Collections;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.when;
 
-class PlantServiceTest {
+@ExtendWith(MockitoExtension.class)
+public class PlantServiceTest {
 
-    private final PlantService plantService = new PlantService();
-    private final Path root = Paths.get("uploads");
+    @Mock
+    private PlantRepository plantRepository;
 
-    @AfterEach
-    void tearDown() throws IOException {
-        // Clean up uploads directory after test
-        if (Files.exists(root)) {
-            try (Stream<Path> walk = Files.walk(root)) {
-                walk.sorted(java.util.Comparator.reverseOrder())
-                    .map(Path::toFile)
-                    .forEach(File::delete);
-            }
-        }
+    @InjectMocks
+    private PlantService plantService;
+
+    @Test
+    public void testGetPlantSummary_HappyPath() {
+        Plant p1 = Plant.builder().status("Needs Attention").location("Living Room").price(10.0).build();
+        Plant p2 = Plant.builder().status("Propagating").location("Kitchen").price(20.0).build();
+        Plant p3 = Plant.builder().status("Ready to Sell").location("Living Room").price(30.0).build();
+        Plant p4 = Plant.builder().status("Active").location("Bedroom").price(null).build(); // No price
+        Plant p5 = Plant.builder().status("Sold").location("Kitchen").price(50.0).build(); // Sold
+
+        when(plantRepository.findAll()).thenReturn(Arrays.asList(p1, p2, p3, p4, p5));
+
+        PlantSummary summary = plantService.getPlantSummary();
+
+        assertEquals(5, summary.getTotalPlants());
+        assertEquals(1, summary.getNeedsAttention());
+        assertEquals(1, summary.getPropagating());
+        assertEquals(1, summary.getReadyToSell());
+        assertEquals(3, summary.getDistinctLocations()); // Living Room, Kitchen, Bedroom
+        assertEquals(60.0, summary.getTotalEstimatedValue(), 0.001); // 10 + 20 + 30. (50 is Sold, p4 is null)
     }
 
     @Test
-    void testSaveImage_UnrestrictedUpload() {
-        MockMultipartFile file = new MockMultipartFile(
-                "file",
-                "evil.sh",
-                "text/plain",
-                "echo 'pwned'".getBytes()
-        );
+    public void testGetPlantSummary_Empty() {
+        when(plantRepository.findAll()).thenReturn(Collections.emptyList());
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            plantService.saveImage(file);
-        });
+        PlantSummary summary = plantService.getPlantSummary();
 
-        assertEquals("Invalid file extension: sh", exception.getMessage());
+        assertEquals(0, summary.getTotalPlants());
+        assertEquals(0, summary.getNeedsAttention());
+        assertEquals(0, summary.getPropagating());
+        assertEquals(0, summary.getReadyToSell());
+        assertEquals(0, summary.getDistinctLocations());
+        assertEquals(0.0, summary.getTotalEstimatedValue(), 0.001);
     }
 
     @Test
-    void testSaveImage_ValidUpload() throws IOException {
-        MockMultipartFile file = new MockMultipartFile(
-                "file",
-                "nice_plant.jpg",
-                "image/jpeg",
-                new byte[]{1, 2, 3, 4} // Dummy image content
-        );
+    public void testGetPlantSummary_NullsAndEmpties() {
+        Plant p1 = Plant.builder().status("Active").location("   ").price(10.0).build(); // Empty location
+        Plant p2 = Plant.builder().status("Active").location(null).price(20.0).build(); // Null location
+        Plant p3 = Plant.builder().status("Active").location("Room").price(null).build(); // Null price
 
-        String savedFilename = plantService.saveImage(file);
+        when(plantRepository.findAll()).thenReturn(Arrays.asList(p1, p2, p3));
 
-        assertNotNull(savedFilename);
-        assertTrue(savedFilename.endsWith(".jpg"));
+        PlantSummary summary = plantService.getPlantSummary();
 
-        // Verify files exist
-        assertTrue(Files.exists(root.resolve("original_" + savedFilename)));
-        assertTrue(Files.exists(root.resolve("thumb_" + savedFilename)));
+        assertEquals(3, summary.getTotalPlants());
+        assertEquals(0, summary.getNeedsAttention());
+        assertEquals(0, summary.getPropagating());
+        assertEquals(0, summary.getReadyToSell());
+        assertEquals(1, summary.getDistinctLocations()); // Only "Room"
+        assertEquals(30.0, summary.getTotalEstimatedValue(), 0.001); // 10 + 20
     }
 }

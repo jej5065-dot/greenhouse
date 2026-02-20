@@ -14,6 +14,8 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@EqualsAndHashCode(exclude = {"parent", "children", "updates", "plantType"})
+@ToString(exclude = {"parent", "children", "updates", "plantType"})
 public class Plant {
 
     @Id
