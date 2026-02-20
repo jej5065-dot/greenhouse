@@ -36,11 +36,10 @@ dependencies {
 task buildFrontend(type: Exec) {
     workingDir 'frontend'
     // Use absolute path for npm found on system
-    def npmPath = '/opt/homebrew/bin/npm'
     if (System.getProperty('os.name').toLowerCase().contains('windows')) {
         commandLine 'npm.cmd', 'run', 'build'
     } else {
-        commandLine npmPath, 'run', 'build'
+        commandLine 'npm', 'run', 'build'
     }
 }
 
