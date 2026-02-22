@@ -4,7 +4,7 @@ import {
   IconButton, Button, TextField, Box, Chip, AppBar, Toolbar, 
   Fab, Dialog, DialogTitle, DialogContent, DialogActions,
   Autocomplete, Checkbox, FormControlLabel, Divider, Menu, MenuItem,
-  Tooltip, Tab, Tabs, InputAdornment
+  Tooltip, Tab, Tabs, InputAdornment, CircularProgress
 } from '@mui/material'
 import { 
   Droplet, Scissors, Search, Plus, Calendar, MapPin, 
@@ -227,22 +227,30 @@ function App() {
     try {
       await axios.post('/api/plant-types/import', formData);
       fetchPlantTypes();
-      alert('Library updated successfully!');
+      showSuccess('Library updated successfully!');
     } catch (error) { showError('CSV Import failed.'); }
   };
 
   const handleWater = async (id: number) => {
-    await axios.post(`/api/plants/${id}/water`);
-    fetchPlants(searchTerm);
-    fetchSummary();
-    if (selectedPlant?.id === id) handleViewDetails(id);
+    setIsProcessing(true);
+    try {
+      await axios.post(`/api/plants/${id}/water`);
+      fetchPlants(searchTerm);
+      fetchSummary();
+      if (selectedPlant?.id === id) handleViewDetails(id);
+    } catch (error) { showError('Failed to log watering.'); }
+    finally { setIsProcessing(false); }
   };
 
   const handlePropagate = async (id: number) => {
-    await axios.post(`/api/plants/${id}/propagate`);
-    fetchPlants(searchTerm);
-    fetchLocations();
-    fetchSummary();
+    setIsProcessing(true);
+    try {
+      await axios.post(`/api/plants/${id}/propagate`);
+      fetchPlants(searchTerm);
+      fetchLocations();
+      fetchSummary();
+    } catch (error) { showError('Failed to propagate.'); }
+    finally { setIsProcessing(false); }
   };
 
   const showError = (msg: string) => {
@@ -257,6 +265,12 @@ function App() {
     setErrorOpen(true);
   };
 
+  const showSuccess = (msg: string) => {
+    setErrorMsg(msg);
+    setErrorSeverity('success');
+    setErrorOpen(true);
+  };
+
   const formatDisplayDate = (dateStr: string) => {
     // Manually parse YYYY-MM-DD to avoid timezone shifting
     const [year, month, day] = dateStr.split('-').map(Number);
@@ -266,6 +280,7 @@ function App() {
 
   const handleDelete = async () => {
     if (plantToDelete === null) return;
+    setIsProcessing(true);
     try {
       await axios.delete(`/api/plants/${plantToDelete}`);
       setSelectedPlant(null);
@@ -276,7 +291,7 @@ function App() {
     } catch (error) {
       console.error('Delete failed:', error);
       showError('Failed to delete plant. Please try again.');
-    }
+    } finally { setIsProcessing(false); }
   };
 
   const triggerDelete = (id: number) => {
@@ -294,6 +309,7 @@ function App() {
   };
 
   const executeDeleteUpdate = async (id: number) => {
+    setIsProcessing(true);
     try {
       await axios.delete(`/api/plants/updates/${id}`);
       setDeleteUpdateConfirmOpen(false);
@@ -302,17 +318,18 @@ function App() {
       fetchPlants(searchTerm);
     } catch (error) {
       showError('Failed to delete history entry.');
-    }
+    } finally { setIsProcessing(false); }
   };
 
   const handleDeleteImage = async (imageId: number) => {
+    setIsProcessing(true);
     try {
       await axios.delete(`/api/plants/images/${imageId}`);
       if (selectedPlant) handleViewDetails(selectedPlant.id, detailTab);
       fetchPlants(searchTerm);
     } catch (error) {
       showError('Failed to delete image.');
-    }
+    } finally { setIsProcessing(false); }
   };
 
   const handleAddPlant = async () => {
@@ -372,6 +389,7 @@ function App() {
 
   const handleUpdatePlant = async () => {
     if (!selectedPlant) return;
+    setIsProcessing(true);
     try {
       // Create a shallow copy and remove relationships that can cause circular JSON errors
       const plantToUpdate = { ...selectedPlant };
@@ -382,10 +400,11 @@ function App() {
       await fetchPlants(searchTerm);
       await fetchSummary();
       setSelectedPlant(null);
+      showSuccess('Plant updated successfully.');
     } catch (error) {
       console.error('Update failed:', error);
       showError('Failed to save changes. Please check your connection.');
-    }
+    } finally { setIsProcessing(false); }
   };
 
   const handleViewDetails = async (id: number, tabIndex = 0) => {
@@ -401,6 +420,7 @@ function App() {
     const formData = new FormData();
     formData.append('file', file);
 
+    setIsProcessing(true);
     try {
       if (uploadingToUpdateId) {
         await axios.post(`/api/plants/updates/${uploadingToUpdateId}/images`, formData);
@@ -416,14 +436,16 @@ function App() {
       handleViewDetails(selectedPlant.id, detailTab);
       fetchPlants(searchTerm);
       setUploadingToUpdateId(null);
+      showSuccess('Image uploaded successfully.');
     } catch (error) { 
       console.error('Upload failed', error);
       showError('Upload failed. The image might be too large.');
-    }
+    } finally { setIsProcessing(false); }
   };
 
   const handleUpdateLabel = async () => {
     if (!imageToLabel || !selectedPlant) return;
+    setIsProcessing(true);
     try {
       await axios.put(`/api/plants/images/${imageToLabel.id}/label`, imageToLabel.label, {
         headers: { 'Content-Type': 'text/plain' }
@@ -432,7 +454,7 @@ function App() {
       handleViewDetails(selectedPlant.id, detailTab);
     } catch (error) {
       showError('Failed to update label.');
-    }
+    } finally { setIsProcessing(false); }
   };
 
   const handleAddUpdate = async () => {
@@ -450,18 +472,21 @@ function App() {
       return;
     }
 
+    setIsProcessing(true);
     try {
       await axios.post(`/api/plants/${selectedPlant.id}/updates`, newUpdate);
       setUpdateDialogOpen(false);
       setNewUpdate({ date: getYesterdayDateString(), notes: '' });
       handleViewDetails(selectedPlant.id, 2); // Switch to History tab (index 2)
+      showSuccess('Entry added successfully.');
     } catch (error: any) {
       showError('Failed to add update.');
-    }
+    } finally { setIsProcessing(false); }
   };
 
   const handleEditUpdate = async () => {
     if (!editingUpdate || !selectedPlant) return;
+    setIsProcessing(true);
     try {
       await axios.put(`/api/plants/updates/${editingUpdate.id}`, {
         date: editingUpdate.date,
@@ -469,9 +494,10 @@ function App() {
       });
       setEditingUpdate(null);
       handleViewDetails(selectedPlant.id, 2);
+      showSuccess('Entry updated successfully.');
     } catch (error) {
       showError('Failed to update entry.');
-    }
+    } finally { setIsProcessing(false); }
   };
 
   const addTodayAndUpload = async (force = false) => {
@@ -511,6 +537,7 @@ function App() {
 
   const handleRotate = async (imageId: number, currentRotation: number) => {
     const nextRotation = (currentRotation + 90) % 360;
+    setIsProcessing(true);
     try {
       await axios.put(`/api/plants/images/${imageId}/rotation`, nextRotation, {
         headers: { 'Content-Type': 'application/json' }
@@ -518,11 +545,12 @@ function App() {
       if (selectedPlant) handleViewDetails(selectedPlant.id, detailTab);
     } catch (error) {
       showError('Failed to rotate image.');
-    }
+    } finally { setIsProcessing(false); }
   };
 
   const handleRotateMain = async (plantId: number, currentRotation: number) => {
     const nextRotation = (currentRotation + 90) % 360;
+    setIsProcessing(true);
     try {
       await axios.put(`/api/plants/${plantId}/rotation`, nextRotation, {
         headers: { 'Content-Type': 'application/json' }
@@ -531,17 +559,18 @@ function App() {
       fetchPlants(searchTerm);
     } catch (error) {
       showError('Failed to rotate cover photo.');
-    }
+    } finally { setIsProcessing(false); }
   };
 
   const handleSetCover = async (plantId: number, imageId: number) => {
+    setIsProcessing(true);
     try {
       await axios.post(`/api/plants/${plantId}/cover/${imageId}`);
       handleViewDetails(plantId, 0); // Jump back to Info to see the result
       fetchPlants(searchTerm);
     } catch (error) {
       showError('Failed to set cover photo.');
-    }
+    } finally { setIsProcessing(false); }
   };
 
   const triggerUpdateUpload = (updateId: number) => {
@@ -725,10 +754,10 @@ function App() {
                 </CardContent>
                 <CardActions sx={{ px: 2, pb: 2, justifyContent: 'space-between' }}>
                   <Box>
-                    <Tooltip title="Water Now"><IconButton size="small" color="primary" onClick={(e) => {e.stopPropagation(); handleWater(plant.id)}}><Droplet size={18} /></IconButton></Tooltip>
-                    <Tooltip title="Propagate"><IconButton size="small" color="secondary" onClick={(e) => {e.stopPropagation(); handlePropagate(plant.id)}}><Scissors size={18} /></IconButton></Tooltip>
+                    <Tooltip title="Water Now"><IconButton size="small" color="primary" onClick={(e) => {e.stopPropagation(); handleWater(plant.id)}} disabled={isProcessing}><Droplet size={18} /></IconButton></Tooltip>
+                    <Tooltip title="Propagate"><IconButton size="small" color="secondary" onClick={(e) => {e.stopPropagation(); handlePropagate(plant.id)}} disabled={isProcessing}><Scissors size={18} /></IconButton></Tooltip>
                   </Box>
-                  <IconButton size="small" onClick={(e) => {e.stopPropagation(); triggerUpload(plant.id)}}><Camera size={18} /></IconButton>
+                  <IconButton size="small" onClick={(e) => {e.stopPropagation(); triggerUpload(plant.id)}} disabled={isProcessing}><Camera size={18} /></IconButton>
                 </CardActions>
               </Card>
             </Grid>
@@ -740,7 +769,7 @@ function App() {
       <Dialog open={Boolean(selectedPlant)} onClose={() => setSelectedPlant(null)} fullWidth maxWidth="sm">
         {selectedPlant && (
           <>
-            <DialogTitle sx={{ pb: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <DialogTitle sx={{ pb: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'primary.main' }}>
               <Box>
                 <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{selectedPlant.name}</Typography>
                 <Typography variant="caption" color="textSecondary">#{selectedPlant.id} | GUID: {selectedPlant.guid}</Typography>
@@ -1050,7 +1079,9 @@ function App() {
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setSelectedPlant(null)}>Close</Button>
-              <Button onClick={handleUpdatePlant} variant="contained">Save Changes</Button>
+              <Button onClick={handleUpdatePlant} variant="contained" disabled={isProcessing}>
+                {isProcessing ? <CircularProgress size={24} color="inherit" /> : 'Save Changes'}
+              </Button>
             </DialogActions>
           </>
         )}
@@ -1060,7 +1091,7 @@ function App() {
 
       {/* Basic Add Modal */}
       <Dialog open={openAdd} onClose={() => setOpenAdd(false)} fullWidth maxWidth="xs">
-        <DialogTitle>Quick Add Plant</DialogTitle>
+        <DialogTitle sx={{ color: 'primary.main', fontWeight: 'bold' }}>Quick Add Plant</DialogTitle>
         <DialogContent>
           <TextField fullWidth label="Name" sx={{ mt: 1 }} value={newPlant.name} onChange={(e) => setNewPlant({...newPlant, name: e.target.value})} size="small" />
           <Autocomplete 
@@ -1212,8 +1243,8 @@ function App() {
 
       {/* Add Update Day Dialog */}
       <Dialog open={updateDialogOpen} onClose={() => setUpdateDialogOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
-          <History color="#2e7d32" />
+        <DialogTitle sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1, color: 'primary.main' }}>
+          <History color="inherit" />
           Add Daily Growth Entry
         </DialogTitle>
         <DialogContent>
@@ -1237,13 +1268,15 @@ function App() {
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setUpdateDialogOpen(false)} color="inherit">Cancel</Button>
-          <Button onClick={handleAddUpdate} variant="contained" color="primary">Save Growth Day</Button>
+          <Button onClick={handleAddUpdate} variant="contained" color="primary" disabled={isProcessing}>
+            {isProcessing ? <CircularProgress size={24} color="inherit" /> : 'Save Growth Day'}
+          </Button>
         </DialogActions>
       </Dialog>
 
       {/* Edit History Entry Dialog */}
       <Dialog open={Boolean(editingUpdate)} onClose={() => setEditingUpdate(null)} fullWidth maxWidth="xs">
-        <DialogTitle sx={{ fontWeight: 'bold' }}>Edit History Entry</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 'bold', color: 'primary.main' }}>Edit History Entry</DialogTitle>
         <DialogContent>
           <TextField 
             fullWidth label="Entry Date" type="date" sx={{ mt: 1 }}
@@ -1261,13 +1294,15 @@ function App() {
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setEditingUpdate(null)} color="inherit">Cancel</Button>
-          <Button onClick={handleEditUpdate} variant="contained" color="primary">Update Entry</Button>
+          <Button onClick={handleEditUpdate} variant="contained" color="primary" disabled={isProcessing}>
+            {isProcessing ? <CircularProgress size={24} color="inherit" /> : 'Update Entry'}
+          </Button>
         </DialogActions>
       </Dialog>
 
       {/* Duplicate Day Prompt */}
       <Dialog open={duplicateDayOpen} onClose={() => setDuplicateDayOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 'bold' }}>Entry Already Exists</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 'bold', color: 'primary.main' }}>Entry Already Exists</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="textSecondary">
             You've already added an entry for today. Would you like to add another photo to today's entry, or backdate a new one?
@@ -1300,7 +1335,7 @@ function App() {
 
       {/* Edit Photo Label Dialog */}
       <Dialog open={labelDialogOpen} onClose={() => setLabelDialogOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle sx={{ fontWeight: 'bold' }}>Edit Photo Label</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 'bold', color: 'primary.main' }}>Edit Photo Label</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
             Provide a short label for this photo (e.g., "Top Down", "New Leaf").
@@ -1315,14 +1350,16 @@ function App() {
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setLabelDialogOpen(false)} color="inherit">Cancel</Button>
-          <Button onClick={handleUpdateLabel} variant="contained" color="primary">Update Label</Button>
+          <Button onClick={handleUpdateLabel} variant="contained" color="primary" disabled={isProcessing}>
+            {isProcessing ? <CircularProgress size={24} color="inherit" /> : 'Update Label'}
+          </Button>
         </DialogActions>
       </Dialog>
 
       {/* Delete Update Confirmation Dialog */}
       <Dialog open={deleteUpdateConfirmOpen} onClose={() => setDeleteUpdateConfirmOpen(false)} maxWidth="xs">
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <AlertCircle color="#ed6c02" /> 
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'error.main', fontWeight: 'bold' }}>
+          <AlertCircle />
           Delete History Entry
         </DialogTitle>
         <DialogContent>
@@ -1335,14 +1372,16 @@ function App() {
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setDeleteUpdateConfirmOpen(false)} color="inherit">Cancel</Button>
-          <Button onClick={() => updateToDelete && executeDeleteUpdate(updateToDelete.id)} variant="contained" color="error">Delete Entry</Button>
+          <Button onClick={() => updateToDelete && executeDeleteUpdate(updateToDelete.id)} variant="contained" color="error" disabled={isProcessing}>
+            {isProcessing ? <CircularProgress size={24} color="inherit" /> : 'Delete Entry'}
+          </Button>
         </DialogActions>
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} maxWidth="xs">
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <AlertCircle color="#ed6c02" /> 
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'error.main', fontWeight: 'bold' }}>
+          <AlertCircle />
           Confirm Deletion
         </DialogTitle>
         <DialogContent>
@@ -1352,21 +1391,26 @@ function App() {
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setDeleteConfirmOpen(false)} color="inherit">Cancel</Button>
-          <Button onClick={handleDelete} variant="contained" color="error">Delete Plant</Button>
+          <Button onClick={handleDelete} variant="contained" color="error" disabled={isProcessing}>
+            {isProcessing ? <CircularProgress size={24} color="inherit" /> : 'Delete Plant'}
+          </Button>
         </DialogActions>
       </Dialog>
 
       {/* Error/Warning Dialog */}
       <Dialog open={errorOpen} onClose={() => setErrorOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: errorSeverity === 'error' ? 'error.main' : 'warning.main', fontWeight: 'bold' }}>
-          {errorSeverity === 'error' ? <AlertCircle /> : <AlertTriangle />}
-          {errorSeverity === 'error' ? 'Oops! Something went wrong' : 'Note'}
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: `${errorSeverity}.main`, fontWeight: 'bold' }}>
+          {errorSeverity === 'error' && <AlertCircle />}
+          {errorSeverity === 'warning' && <AlertTriangle />}
+          {errorSeverity === 'success' && <Check />}
+          {errorSeverity === 'info' && <Info />}
+          {errorSeverity === 'error' ? 'Oops! Something went wrong' : (errorSeverity === 'warning' ? 'Note' : (errorSeverity === 'success' ? 'Success' : 'Info'))}
         </DialogTitle>
         <DialogContent>
           <Typography variant="body1">{errorMsg}</Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setErrorOpen(false)} variant="contained" color={errorSeverity === 'error' ? 'primary' : 'warning'}>Dismiss</Button>
+          <Button onClick={() => setErrorOpen(false)} variant="contained" color={errorSeverity}>Dismiss</Button>
         </DialogActions>
       </Dialog>
     </Box>
