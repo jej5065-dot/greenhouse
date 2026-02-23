@@ -14,8 +14,8 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(exclude = {"parent", "children", "updates", "plantType"})
-@ToString(exclude = {"parent", "children", "updates", "plantType"})
+@EqualsAndHashCode
+@ToString
 public class Plant {
 
     @Id
@@ -30,6 +30,8 @@ public class Plant {
 
     @ManyToOne
     @JoinColumn(name = "plant_type_id")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private PlantType plantType;
 
     @ManyToOne

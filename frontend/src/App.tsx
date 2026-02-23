@@ -4,13 +4,15 @@ import {
   IconButton, Button, TextField, Box, Chip, AppBar, Toolbar, 
   Fab, Dialog, DialogTitle, DialogContent, DialogActions,
   Autocomplete, Checkbox, FormControlLabel, Divider, Menu, MenuItem,
-  Tooltip, Tab, Tabs, InputAdornment, CircularProgress
+  Tooltip, Tab, Tabs, InputAdornment, CircularProgress,
+  ToggleButton, ToggleButtonGroup, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, Paper
 } from '@mui/material'
 import { 
   Droplet, Scissors, Search, Plus, Calendar, MapPin, 
   AlertCircle, AlertTriangle, Image as ImageIcon, Trash2,
   Camera, DollarSign, Sprout, Info, Settings, ArrowUpDown,
-  ExternalLink
+  ExternalLink, BookOpen, LayoutGrid, AlignJustify, Grid as GridIcon, Sparkles
 } from 'lucide-react'
 import axios from 'axios'
 import ReactQuill from 'react-quill'
@@ -20,6 +22,7 @@ import {
   Image as GalleryIcon, ChevronLeft, ChevronRight, FileUp, Skull,
   Download, RefreshCw, Trash2 as TrashIcon
 } from 'lucide-react'
+import PlantLibraryDialog from './components/PlantLibraryDialog';
 
 interface PlantType {
   id: number;
@@ -30,6 +33,7 @@ interface PlantType {
   careInstructions: string;
   propagationInstructions: string;
   defaultWateringFrequencyDays: number;
+  exampleImagePath?: string;
 }
 
 interface PlantImage {
@@ -104,6 +108,29 @@ function App() {
   const [errorMsg, setErrorMsg] = useState('');
   const [errorSeverity, setErrorSeverity] = useState<'error' | 'warning' | 'info' | 'success'>('error');
   const [detailTab, setDetailTab] = useState(0);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'gallery' | 'compact' | 'table'>('gallery');
+  const [scrollToId, setScrollToId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (scrollToId && plants.length > 0) {
+      // Small timeout to allow DOM to settle
+      setTimeout(() => {
+        const element = document.getElementById(`plant-${scrollToId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Highlight effect
+          element.style.transition = 'background-color 0.5s';
+          const originalBg = element.style.backgroundColor;
+          element.style.backgroundColor = 'rgba(25, 118, 210, 0.1)';
+          setTimeout(() => {
+            element.style.backgroundColor = originalBg;
+          }, 1500);
+          setScrollToId(null);
+        }
+      }, 100);
+    }
+  }, [plants, scrollToId]);
 
   const getLocalDateString = (date = new Date()) => {
     const year = date.getFullYear();
@@ -332,6 +359,35 @@ function App() {
     } finally { setIsProcessing(false); }
   };
 
+  const handleIdentify = async () => {
+    if (!initialPlantFile) {
+      showError('Please upload a photo first to identify.');
+      return;
+    }
+
+    setIsProcessing(true);
+    // Mock AI Identification Service
+    // In a real app, you would send `initialPlantFile` to an endpoint like /api/identify
+    setTimeout(() => {
+      const mockTypes = plantTypes.length > 0 ? plantTypes : [
+        { name: 'Monstera Deliciosa', defaultWateringFrequencyDays: 7 },
+        { name: 'Ficus Lyrata', defaultWateringFrequencyDays: 10 },
+        { name: 'Pothos', defaultWateringFrequencyDays: 5 }
+      ];
+      const result = mockTypes[Math.floor(Math.random() * mockTypes.length)] as PlantType;
+
+      setNewPlant({
+        ...newPlant,
+        name: result.name,
+        plantType: result,
+        wateringFrequencyDays: result.defaultWateringFrequencyDays || 7
+      });
+
+      setIsProcessing(false);
+      showSuccess(`Identified as ${result.name}!`);
+    }, 1500);
+  };
+
   const handleAddPlant = async () => {
     if (!newPlant.name) {
       showError('Please enter a name for the plant.');
@@ -378,6 +434,7 @@ function App() {
       await fetchSummary();
       setNewPlant({ name: '', wateringFrequencyDays: 7, location: '', goodForTerrariums: false, status: 'Active' });
       handleViewDetails(createdPlant.id);
+      setScrollToId(createdPlant.id);
     } catch (error: any) {
       console.error('Add plant failed details:', error);
       const msg = error.response?.data?.message || error.message || 'Server error';
@@ -399,6 +456,7 @@ function App() {
       await axios.put(`/api/plants/${selectedPlant.id}`, plantToUpdate);
       await fetchPlants(searchTerm);
       await fetchSummary();
+      setScrollToId(selectedPlant.id);
       setSelectedPlant(null);
       showSuccess('Plant updated successfully.');
     } catch (error) {
@@ -612,6 +670,9 @@ function App() {
                 <RefreshCw size={20} className={isProcessing ? 'animate-spin' : ''} />
               </IconButton>
             </Tooltip>
+            <Tooltip title="Manage Plant Library">
+              <IconButton color="inherit" onClick={() => setLibraryOpen(true)}><BookOpen size={20} /></IconButton>
+            </Tooltip>
             <Tooltip title="Import Plant Library (CSV)">
               <IconButton color="inherit" onClick={() => csvInputRef.current?.click()}><FileUp size={20} /></IconButton>
             </Tooltip>
@@ -670,99 +731,201 @@ function App() {
             <Button variant="text" size="small" onClick={() => fetchPlants('')}>All</Button>
           </Box>
           
-          <Button startIcon={<ArrowUpDown size={18} />} onClick={(e) => setSortAnchor(e.currentTarget)} size="small">
-            Sort: {sortBy === 'nextWaterDate' ? 'Urgency' : sortBy}
-          </Button>
-          <Menu anchorEl={sortAnchor} open={Boolean(sortAnchor)} onClose={() => setSortAnchor(null)}>
-            <MenuItem onClick={() => handleSetSort('nextWaterDate')}>Urgency (Watering)</MenuItem>
-            <MenuItem onClick={() => handleSetSort('id')}>Plant Number</MenuItem>
-            <MenuItem onClick={() => handleSetSort('name')}>Name</MenuItem>
-            <MenuItem onClick={() => handleSetSort('type')}>Type</MenuItem>
-          </Menu>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Button startIcon={<ArrowUpDown size={18} />} onClick={(e) => setSortAnchor(e.currentTarget)} size="small">
+              Sort: {sortBy === 'nextWaterDate' ? 'Urgency' : sortBy}
+            </Button>
+            <Menu anchorEl={sortAnchor} open={Boolean(sortAnchor)} onClose={() => setSortAnchor(null)}>
+              <MenuItem onClick={() => handleSetSort('nextWaterDate')}>Urgency (Watering)</MenuItem>
+              <MenuItem onClick={() => handleSetSort('id')}>Plant Number</MenuItem>
+              <MenuItem onClick={() => handleSetSort('name')}>Name</MenuItem>
+              <MenuItem onClick={() => handleSetSort('type')}>Type</MenuItem>
+            </Menu>
+            <ToggleButtonGroup
+              value={viewMode}
+              exclusive
+              onChange={(_, newMode) => newMode && setViewMode(newMode)}
+              size="small"
+            >
+              <ToggleButton value="gallery"><GridIcon size={16} /></ToggleButton>
+              <ToggleButton value="compact"><LayoutGrid size={16} /></ToggleButton>
+              <ToggleButton value="table"><AlignJustify size={16} /></ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
         </Box>
 
-        <Grid container spacing={2}>
-          {plants.map((plant) => (
-            <Grid item xs={12} sm={6} md={4} key={plant.id}>
-              <Card sx={{ height: '100%', borderRadius: 3, transition: '0.2s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 } }}>
-                <Box sx={{ height: 180, bgcolor: '#e0e0e0', position: 'relative', overflow: 'hidden' }}>
-                  {plant.imagePath ? (
-                    <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
-                      <img 
-                        src={`/uploads/thumb_${plant.imagePath}?t=${new Date().getTime()}`} 
-                        alt={plant.name} 
-                        style={{ 
-                          width: '100%', 
-                          height: '100%', 
-                          objectFit: 'cover', 
-                          cursor: 'pointer',
-                          transform: `rotate(${plant.rotation || 0}deg)` 
-                        }} 
-                        onClick={() => setFullImage({ images: [{path: plant.imagePath, rotation: plant.rotation || 0}], index: 0 })}
-                      />
-                      <IconButton 
-                        size="small" 
-                        sx={{ position: 'absolute', bottom: 8, right: 8, bgcolor: 'rgba(255,255,255,0.7)', '&:hover': { bgcolor: 'white' } }}
-                        onClick={() => setFullImage({ images: [{path: plant.imagePath, rotation: plant.rotation || 0}], index: 0 })}
-                      >
-                        <Search size={14} />
-                      </IconButton>
+        {viewMode === 'gallery' && (
+          <Grid container spacing={2}>
+            {plants.map((plant) => (
+              <Grid item xs={12} sm={6} md={4} key={plant.id} id={`plant-${plant.id}`}>
+                <Card sx={{ height: '100%', borderRadius: 3, transition: '0.2s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 } }}>
+                  <Box sx={{ height: 180, bgcolor: '#e0e0e0', position: 'relative', overflow: 'hidden' }}>
+                    {plant.imagePath ? (
+                      <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
+                        <img
+                          src={`/uploads/thumb_${plant.imagePath}?t=${new Date().getTime()}`}
+                          alt={plant.name}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            cursor: 'pointer',
+                            transform: `rotate(${plant.rotation || 0}deg)`
+                          }}
+                          onClick={() => setFullImage({ images: [{path: plant.imagePath, rotation: plant.rotation || 0}], index: 0 })}
+                        />
+                        <IconButton
+                          size="small"
+                          sx={{ position: 'absolute', bottom: 8, right: 8, bgcolor: 'rgba(255,255,255,0.7)', '&:hover': { bgcolor: 'white' } }}
+                          onClick={() => setFullImage({ images: [{path: plant.imagePath, rotation: plant.rotation || 0}], index: 0 })}
+                        >
+                          <Search size={14} />
+                        </IconButton>
+                      </Box>
+                    ) : (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', cursor: 'pointer' }} onClick={() => handleViewDetails(plant.id)}>
+                        <ImageIcon size={40} color="#999" />
+                        <Typography variant="caption" color="textSecondary">No Photo</Typography>
+                      </Box>
+                    )}
+                    {plant.goodForTerrariums && (
+                      <Chip label="Terrarium" size="small" color="secondary" sx={{ position: 'absolute', top: 8, right: 8, height: 20, fontSize: '0.65rem' }} />
+                    )}
+                    <Box
+                      sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, cursor: 'pointer' }}
+                      onClick={(e) => { if (e.target === e.currentTarget) handleViewDetails(plant.id); }}
+                    />
+                  </Box>
+                  <CardContent sx={{ pb: 1 }} onClick={() => handleViewDetails(plant.id)} style={{ cursor: 'pointer' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Typography variant="caption" color="textSecondary" sx={{ fontWeight: 500 }}>
+                        #{plant.id} • {plant.plantType?.name || 'Unknown Type'}
+                      </Typography>
+                      {getToxicityColor(plant.plantType?.petToxicity) && (
+                        <Tooltip title={`Toxicity: ${plant.plantType?.petToxicity}`}>
+                          <Skull size={14} color={getToxicityColor(plant.plantType?.petToxicity) || '#999'} />
+                        </Tooltip>
+                      )}
                     </Box>
-                  ) : (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', cursor: 'pointer' }} onClick={() => handleViewDetails(plant.id)}>
-                      <ImageIcon size={40} color="#999" />
-                      <Typography variant="caption" color="textSecondary">No Photo</Typography>
-                    </Box>
-                  )}
-                  {plant.goodForTerrariums && (
-                    <Chip label="Terrarium" size="small" color="secondary" sx={{ position: 'absolute', top: 8, right: 8, height: 20, fontSize: '0.65rem' }} />
-                  )}
-                  <Box 
-                    sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, cursor: 'pointer' }} 
-                    onClick={(e) => { if (e.target === e.currentTarget) handleViewDetails(plant.id); }}
-                  />
-                </Box>
-                <CardContent sx={{ pb: 1 }} onClick={() => handleViewDetails(plant.id)} style={{ cursor: 'pointer' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <Typography variant="caption" color="textSecondary" sx={{ fontWeight: 500 }}>
-                      #{plant.id} • {plant.plantType?.name || 'Unknown Type'}
+                    <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {plant.name}
                     </Typography>
-                    {getToxicityColor(plant.plantType?.petToxicity) && (
-                      <Tooltip title={`Toxicity: ${plant.plantType?.petToxicity}`}>
-                        <Skull size={14} color={getToxicityColor(plant.plantType?.petToxicity) || '#999'} />
-                      </Tooltip>
+                    {plant.plantType?.scientificName && (
+                      <Typography variant="caption" color="textSecondary" sx={{ fontStyle: 'italic', display: 'block', mb: 1 }}>
+                        {plant.plantType.scientificName}
+                      </Typography>
+                    )}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <MapPin size={14} />
+                      <Typography variant="body2" color="textSecondary">{plant.location || 'Unknown'}</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Droplet size={14} color={plant.status === 'Needs Attention' ? '#ed6c02' : '#2e7d32'} />
+                      <Typography variant="body2" sx={{ fontWeight: 500, color: plant.status === 'Needs Attention' ? 'warning.main' : 'text.primary' }}>
+                        Next: {plant.nextWaterDate ? new Date(plant.nextWaterDate).toLocaleDateString() : 'TBD'}
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                  <CardActions sx={{ px: 2, pb: 2, justifyContent: 'space-between' }}>
+                    <Box>
+                      <Tooltip title="Water Now"><IconButton size="small" color="primary" onClick={(e) => {e.stopPropagation(); handleWater(plant.id)}} disabled={isProcessing}><Droplet size={18} /></IconButton></Tooltip>
+                      <Tooltip title="Propagate"><IconButton size="small" color="secondary" onClick={(e) => {e.stopPropagation(); handlePropagate(plant.id)}} disabled={isProcessing}><Scissors size={18} /></IconButton></Tooltip>
+                    </Box>
+                    <IconButton size="small" onClick={(e) => {e.stopPropagation(); triggerUpload(plant.id)}} disabled={isProcessing}><Camera size={18} /></IconButton>
+                  </CardActions>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        )}
+
+        {viewMode === 'compact' && (
+          <Grid container spacing={1}>
+            {plants.map((plant) => (
+              <Grid item xs={4} sm={3} md={2} key={plant.id} id={`plant-${plant.id}`}>
+                <Card sx={{ height: '100%', cursor: 'pointer', '&:hover': { boxShadow: 4 } }} onClick={() => handleViewDetails(plant.id)}>
+                  <Box sx={{ pt: '100%', position: 'relative', bgcolor: '#eee' }}>
+                    {plant.imagePath ? (
+                      <img 
+                        src={`/uploads/thumb_${plant.imagePath}`}
+                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', transform: `rotate(${plant.rotation || 0}deg)` }}
+                      />
+                    ) : (
+                      <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                         <ImageIcon size={24} color="#999" />
+                      </Box>
+                    )}
+                    <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, bgcolor: 'rgba(0,0,0,0.6)', color: 'white', p: 0.5 }}>
+                       <Typography variant="caption" sx={{ display: 'block', fontWeight: 'bold', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{plant.name}</Typography>
+                       <Typography variant="caption" sx={{ fontSize: '0.65rem' }}>#{plant.id}</Typography>
+                    </Box>
+                    {plant.status === 'Needs Attention' && (
+                      <Box sx={{ position: 'absolute', top: 4, right: 4, bgcolor: 'warning.main', borderRadius: '50%', width: 8, height: 8 }} />
                     )}
                   </Box>
-                  <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {plant.name}
-                  </Typography>
-                  {plant.plantType?.scientificName && (
-                    <Typography variant="caption" color="textSecondary" sx={{ fontStyle: 'italic', display: 'block', mb: 1 }}>
-                      {plant.plantType.scientificName}
-                    </Typography>
-                  )}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <MapPin size={14} />
-                    <Typography variant="body2" color="textSecondary">{plant.location || 'Unknown'}</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Droplet size={14} color={plant.status === 'Needs Attention' ? '#ed6c02' : '#2e7d32'} />
-                    <Typography variant="body2" sx={{ fontWeight: 500, color: plant.status === 'Needs Attention' ? 'warning.main' : 'text.primary' }}>
-                      Next: {plant.nextWaterDate ? new Date(plant.nextWaterDate).toLocaleDateString() : 'TBD'}
-                    </Typography>
-                  </Box>
-                </CardContent>
-                <CardActions sx={{ px: 2, pb: 2, justifyContent: 'space-between' }}>
-                  <Box>
-                    <Tooltip title="Water Now"><IconButton size="small" color="primary" onClick={(e) => {e.stopPropagation(); handleWater(plant.id)}} disabled={isProcessing}><Droplet size={18} /></IconButton></Tooltip>
-                    <Tooltip title="Propagate"><IconButton size="small" color="secondary" onClick={(e) => {e.stopPropagation(); handlePropagate(plant.id)}} disabled={isProcessing}><Scissors size={18} /></IconButton></Tooltip>
-                  </Box>
-                  <IconButton size="small" onClick={(e) => {e.stopPropagation(); triggerUpload(plant.id)}} disabled={isProcessing}><Camera size={18} /></IconButton>
-                </CardActions>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        )}
+
+        {viewMode === 'table' && (
+          <TableContainer component={Paper} elevation={1}>
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                  <TableCell width={50}>#</TableCell>
+                  <TableCell width={60}>Img</TableCell>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Type</TableCell>
+                  <TableCell>Location</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Next Water</TableCell>
+                  <TableCell align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {plants.map((plant) => (
+                  <TableRow key={plant.id} hover id={`plant-${plant.id}`} onClick={() => handleViewDetails(plant.id)} sx={{ cursor: 'pointer' }}>
+                    <TableCell>{plant.id}</TableCell>
+                    <TableCell>
+                      {plant.imagePath ? (
+                        <Box
+                          component="img"
+                          src={`/uploads/thumb_${plant.imagePath}`}
+                          sx={{ width: 40, height: 40, borderRadius: 1, objectFit: 'cover', transform: `rotate(${plant.rotation || 0}deg)` }}
+                        />
+                      ) : <Box sx={{ width: 40, height: 40, bgcolor: '#eee', borderRadius: 1 }} />}
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 500 }}>{plant.name}</TableCell>
+                    <TableCell>{plant.plantType?.name}</TableCell>
+                    <TableCell>{plant.location}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={plant.status}
+                        size="small"
+                        color={plant.status === 'Needs Attention' ? 'warning' : (plant.status === 'Propagating' ? 'secondary' : 'default')}
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {plant.nextWaterDate && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: new Date(plant.nextWaterDate) <= new Date() ? 'error.main' : 'inherit' }}>
+                          <Droplet size={12} />
+                          {new Date(plant.nextWaterDate).toLocaleDateString()}
+                        </Box>
+                      )}
+                    </TableCell>
+                    <TableCell align="right">
+                      <IconButton size="small" onClick={(e) => {e.stopPropagation(); handleWater(plant.id)}}><Droplet size={16} /></IconButton>
+                      <IconButton size="small" onClick={(e) => {e.stopPropagation(); triggerUpload(plant.id)}}><CameraIcon size={16} /></IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
       </Container>
 
       {/* Plant Detail/Edit Modal */}
@@ -1121,9 +1284,21 @@ function App() {
           
           <Box sx={{ mt: 3, p: 2, border: '1px dashed #ccc', borderRadius: 2, textAlign: 'center' }}>
             {initialPlantFile ? (
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-                <Typography variant="body2" noWrap sx={{ maxWidth: 150 }}>{initialPlantFile.name}</Typography>
-                <IconButton size="small" color="error" onClick={() => setInitialPlantFile(null)}><X size={14} /></IconButton>
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                  <Typography variant="body2" noWrap sx={{ maxWidth: 150 }}>{initialPlantFile.name}</Typography>
+                  <IconButton size="small" color="error" onClick={() => setInitialPlantFile(null)}><X size={14} /></IconButton>
+                </Box>
+                <Button
+                  variant="contained"
+                  color="secondary"
+                  size="small"
+                  startIcon={<Sparkles size={16} />}
+                  onClick={handleIdentify}
+                  disabled={isProcessing}
+                >
+                  {isProcessing ? 'Identifying...' : 'Identify with AI'}
+                </Button>
               </Box>
             ) : (
               <Button 
@@ -1413,6 +1588,8 @@ function App() {
           <Button onClick={() => setErrorOpen(false)} variant="contained" color={errorSeverity}>Dismiss</Button>
         </DialogActions>
       </Dialog>
+
+      <PlantLibraryDialog open={libraryOpen} onClose={() => { setLibraryOpen(false); fetchPlantTypes(); }} />
     </Box>
   );
 }
