@@ -275,7 +275,13 @@ public class PlantService {
     }
 
     public List<Plant> searchPlants(String term) {
-        return plantRepository.search(term);
+        Long id = -1L;
+        try {
+            id = Long.parseLong(term);
+        } catch (NumberFormatException e) {
+            // Not a number, ignore
+        }
+        return plantRepository.search(term, id);
     }
 
     public List<String> getLocations() {

@@ -99,7 +99,51 @@ function App() {
   // Modals
   const [openAdd, setOpenAdd] = useState(false);
   const [selectedPlant, setSelectedPlant] = useState<Plant | null>(null);
-  const [fullImage, setFullImage] = useState<{ images: {path: string, rotation: number, label?: string}[], index: number } | null>(null);
+  const [fullImage, setFullImage] = useState<{ 
+    images: {
+      path: string, 
+      rotation: number, 
+      label?: string,
+      date?: string,
+      notes?: string
+    }[], 
+    index: number 
+  } | null>(null);
+
+  const openGalleryForPlant = (plant: Plant, startingPath?: string) => {
+    // Flatten all images from all updates and sort chronologically
+    const allImages = (plant.updates || [])
+      .slice()
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .flatMap(u => (u.images || []).map(img => ({
+        path: img.imagePath,
+        rotation: img.rotation,
+        label: img.label,
+        date: u.date,
+        notes: u.notes
+      })));
+    
+    if (allImages.length === 0) {
+      if (plant.imagePath) {
+        setFullImage({ 
+          images: [{ path: plant.imagePath, rotation: plant.rotation || 0, date: plant.lastWateredDate?.split('T')[0] }], 
+          index: 0 
+        });
+      }
+      return;
+    }
+
+    let index = 0;
+    if (startingPath) {
+      index = allImages.findIndex(img => img.path === startingPath);
+      if (index === -1) index = allImages.length - 1; // Default to latest if not found
+    } else {
+      index = allImages.length - 1; // Default to latest
+    }
+
+    setFullImage({ images: allImages, index });
+  };
+
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [plantToDelete, setPlantToDelete] = useState<number | null>(null);
   const [deleteUpdateConfirmOpen, setDeleteUpdateConfirmOpen] = useState(false);
@@ -772,12 +816,12 @@ function App() {
                             cursor: 'pointer',
                             transform: `rotate(${plant.rotation || 0}deg)`
                           }}
-                          onClick={() => setFullImage({ images: [{path: plant.imagePath, rotation: plant.rotation || 0}], index: 0 })}
+                          onClick={() => openGalleryForPlant(plant, plant.imagePath)}
                         />
                         <IconButton
                           size="small"
                           sx={{ position: 'absolute', bottom: 8, right: 8, bgcolor: 'rgba(255,255,255,0.7)', '&:hover': { bgcolor: 'white' } }}
-                          onClick={() => setFullImage({ images: [{path: plant.imagePath, rotation: plant.rotation || 0}], index: 0 })}
+                          onClick={() => openGalleryForPlant(plant, plant.imagePath)}
                         >
                           <Search size={14} />
                         </IconButton>
@@ -965,7 +1009,7 @@ function App() {
                               cursor: 'pointer',
                               transform: `rotate(${selectedPlant.rotation || 0}deg)` 
                             }} 
-                            onClick={() => setFullImage({ images: [{path: selectedPlant.imagePath, rotation: selectedPlant.rotation || 0}], index: 0 })}
+                            onClick={() => openGalleryForPlant(selectedPlant, selectedPlant.imagePath)}
                           />
                           <Box sx={{ position: 'absolute', bottom: 8, right: 8, display: 'flex', gap: 1 }}>
                             <IconButton size="small" sx={{ bgcolor: 'white', '&:hover': { bgcolor: '#eee' } }} onClick={() => handleDownload(selectedPlant.imagePath)}><Download size={14} /></IconButton>
@@ -1093,10 +1137,7 @@ function App() {
                                 <img 
                                   src={`/uploads/thumb_${img.imagePath}`} 
                                   style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', transform: `rotate(${img.rotation}deg)`, cursor: 'pointer' }}
-                                  onClick={() => setFullImage({ 
-                                    images: update.images.map(i => ({ path: i.imagePath, rotation: i.rotation, label: i.label })), 
-                                    index: idx 
-                                  })}
+                                  onClick={() => openGalleryForPlant(selectedPlant, img.imagePath)}
                                 />
                                 <IconButton 
                                   size="small" 
@@ -1401,12 +1442,22 @@ function App() {
                   boxShadow: '0 0 20px rgba(0,0,0,0.5)'
                 }} 
               />
-              <Box sx={{ position: 'absolute', bottom: 16, left: 0, right: 0, color: 'white', textAlign: 'center' }}>
-                <Typography variant="subtitle1" sx={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
-                  {fullImage.images[fullImage.index].label || 'Untitled Photo'}
+              <Box sx={{ position: 'absolute', bottom: 16, left: 0, right: 0, color: 'white', textAlign: 'center', bgcolor: 'rgba(0,0,0,0.4)', py: 1 }}>
+                <Typography variant="h6" sx={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+                  {fullImage.images[fullImage.index].date ? formatDisplayDate(fullImage.images[fullImage.index].date!) : 'Untitled Photo'}
                 </Typography>
+                {fullImage.images[fullImage.index].notes && (
+                  <Typography variant="body2" sx={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)', mt: 0.5, px: 4 }}>
+                    {fullImage.images[fullImage.index].notes}
+                  </Typography>
+                )}
+                {fullImage.images[fullImage.index].label && (
+                  <Typography variant="caption" sx={{ display: 'block', fontStyle: 'italic', opacity: 0.8 }}>
+                    {fullImage.images[fullImage.index].label}
+                  </Typography>
+                )}
                 {fullImage.images.length > 1 && (
-                  <Typography variant="caption" sx={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)', opacity: 0.8 }}>
+                  <Typography variant="caption" sx={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)', opacity: 0.6, display: 'block', mt: 1 }}>
                     {fullImage.index + 1} of {fullImage.images.length}
                   </Typography>
                 )}

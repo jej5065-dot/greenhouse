@@ -1,6 +1,6 @@
 package org.dined.dined.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -24,6 +24,6 @@ public class PlantImage {
 
     @ManyToOne
     @JoinColumn(name = "update_id")
-    @JsonIgnoreProperties("images")
+    @JsonIgnore
     private PlantUpdate update;
 }

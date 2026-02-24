@@ -1,6 +1,7 @@
 package org.dined.dined.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDate;
@@ -36,14 +37,13 @@ public class Plant {
 
     @ManyToOne
     @JoinColumn(name = "parent_id")
-    @JsonIgnoreProperties("children")
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
+    @JsonIgnore
     private Plant parent;
 
     @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
     @Builder.Default
-    @JsonIgnoreProperties("parent")
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private List<Plant> children = new ArrayList<>();
@@ -51,7 +51,6 @@ public class Plant {
     @OneToMany(mappedBy = "plant", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     @OrderBy("date DESC")
-    @JsonIgnoreProperties("plant")
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private List<PlantUpdate> updates = new ArrayList<>();
@@ -76,6 +75,17 @@ public class Plant {
     
     @Builder.Default
     private Integer rotation = 0;
+
+    // Helper for the frontend Lineage tab since the full 'parent' is ignored
+    @JsonProperty("parent")
+    public java.util.Map<String, Object> getParentSummary() {
+        if (parent == null) return null;
+        java.util.Map<String, Object> summary = new java.util.HashMap<>();
+        summary.put("id", parent.getId());
+        summary.put("name", parent.getName());
+        summary.put("guid", parent.getGuid());
+        return summary;
+    }
 
     @PrePersist
     @PreUpdate

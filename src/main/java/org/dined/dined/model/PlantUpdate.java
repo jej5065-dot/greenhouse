@@ -1,6 +1,6 @@
 package org.dined.dined.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDate;
@@ -25,11 +25,10 @@ public class PlantUpdate {
 
     @ManyToOne
     @JoinColumn(name = "plant_id")
-    @JsonIgnoreProperties({"updates", "children", "parent"})
+    @JsonIgnore
     private Plant plant;
 
     @OneToMany(mappedBy = "update", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    @JsonIgnoreProperties("update")
     private List<PlantImage> images = new ArrayList<>();
 }
