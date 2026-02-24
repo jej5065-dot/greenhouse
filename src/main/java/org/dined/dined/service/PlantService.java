@@ -275,13 +275,20 @@ public class PlantService {
     }
 
     public List<Plant> searchPlants(String term) {
-        Long id = -1L;
-        try {
-            id = Long.parseLong(term);
-        } catch (NumberFormatException e) {
-            // Not a number, ignore
+        if (term == null || term.trim().isEmpty()) {
+            return plantRepository.findAll();
         }
-        return plantRepository.search(term, id);
+
+        try {
+            Long id = Long.parseLong(term.trim());
+            // If it's a number, try to find exact ID match first
+            return plantRepository.findById(id)
+                    .map(List::of)
+                    .orElseGet(() -> plantRepository.search(term, id));
+        } catch (NumberFormatException e) {
+            // Not a number, perform fuzzy search
+            return plantRepository.search(term, -1L);
+        }
     }
 
     public List<String> getLocations() {

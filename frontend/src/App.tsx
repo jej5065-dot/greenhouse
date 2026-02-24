@@ -232,7 +232,7 @@ function App() {
   const csvInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPlantId, setUploadingPlantId] = useState<number | null>(null);
 
-  const fetchPlants = async (search = '') => {
+  const fetchPlants = async (search = '', shouldAutoselect = false) => {
     const res = await axios.get(`/api/plants${search ? `?search=${search}` : ''}`);
     let data = res.data;
     
@@ -244,6 +244,18 @@ function App() {
     });
 
     setPlants(data);
+
+    // Auto-select if requested AND we found a potential match
+    if (shouldAutoselect && data.length > 0) {
+      const searchId = parseInt(search);
+      // If we searched for a number and the first result is that ID
+      if (!isNaN(searchId) && data[0].id === searchId) {
+        handleViewDetails(data[0].id);
+      } else if (data.length === 1) {
+        // Or if there's only one result for a string search, select it too
+        handleViewDetails(data[0].id);
+      }
+    }
   };
 
   const fetchLocations = async () => {
@@ -265,7 +277,7 @@ function App() {
     setIsProcessing(true);
     try {
       await Promise.all([
-        fetchPlants(searchTerm),
+        fetchPlants(searchTerm, false),
         fetchLocations(),
         fetchPlantTypes(),
         fetchSummary()
@@ -276,14 +288,14 @@ function App() {
   };
 
   useEffect(() => {
-    fetchPlants();
+    fetchPlants(searchTerm, false);
     fetchLocations();
     fetchPlantTypes();
     fetchSummary();
 
     // Auto-refresh every 60 seconds to keep multi-user sessions in sync
     const interval = setInterval(() => {
-      fetchPlants(searchTerm);
+      fetchPlants(searchTerm, false);
       fetchSummary();
     }, 60000);
     
