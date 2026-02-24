@@ -27,5 +27,7 @@ public class PlantType {
     @Column(length = 2000)
     private String propagationInstructions;
 
+    private String exampleImagePath;
+
     private Integer defaultWateringFrequencyDays;
 }
