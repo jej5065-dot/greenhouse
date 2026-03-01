@@ -26,11 +26,11 @@ public class PlantServiceTest {
 
     @Test
     public void testGetPlantSummary_HappyPath() {
-        Plant p1 = Plant.builder().status("Needs Attention").location("Living Room").price(10.0).build();
-        Plant p2 = Plant.builder().status("Propagating").location("Kitchen").price(20.0).build();
-        Plant p3 = Plant.builder().status("Ready to Sell").location("Living Room").price(30.0).build();
-        Plant p4 = Plant.builder().status("Active").location("Bedroom").price(null).build(); // No price
-        Plant p5 = Plant.builder().status("Sold").location("Kitchen").price(50.0).build(); // Sold
+        Plant p1 = Plant.builder().plantStatus("Needs Attention").location("Living Room").price(10.0).build();
+        Plant p2 = Plant.builder().currentStage("Propagating").location("Kitchen").price(20.0).build();
+        Plant p3 = Plant.builder().currentStage("Ready to Sell").location("Living Room").price(30.0).build();
+        Plant p4 = Plant.builder().currentStage("Active").location("Bedroom").price(null).build(); // No price
+        Plant p5 = Plant.builder().currentStage("Sold").location("Kitchen").price(50.0).build(); // Sold
 
         when(plantRepository.findAll()).thenReturn(Arrays.asList(p1, p2, p3, p4, p5));
 
@@ -60,9 +60,9 @@ public class PlantServiceTest {
 
     @Test
     public void testGetPlantSummary_NullsAndEmpties() {
-        Plant p1 = Plant.builder().status("Active").location("   ").price(10.0).build(); // Empty location
-        Plant p2 = Plant.builder().status("Active").location(null).price(20.0).build(); // Null location
-        Plant p3 = Plant.builder().status("Active").location("Room").price(null).build(); // Null price
+        Plant p1 = Plant.builder().currentStage("Active").location("   ").price(10.0).build(); // Empty location
+        Plant p2 = Plant.builder().currentStage("Active").location(null).price(20.0).build(); // Null location
+        Plant p3 = Plant.builder().currentStage("Active").location("Room").price(null).build(); // Null price
 
         when(plantRepository.findAll()).thenReturn(Arrays.asList(p1, p2, p3));
 

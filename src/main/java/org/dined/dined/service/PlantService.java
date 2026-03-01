@@ -129,8 +129,32 @@ public class PlantService {
 
     public Plant waterPlant(Long id) {
         Plant plant = getPlantById(id);
-        plant.setLastWateredDate(LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        plant.setLastWateredDate(now);
+        
+        // Explicitly calculate next water date
+        if (plant.getWateringFrequencyDays() != null) {
+            plant.setNextWaterDate(now.toLocalDate().plusDays(plant.getWateringFrequencyDays()));
+        }
+
         // Reset status if it was just water overdue
+        if ("Water Overdue".equals(plant.getPlantStatus())) {
+            plant.setPlantStatus("Healthy");
+        }
+        return plantRepository.save(plant);
+    }
+
+    public Plant snoozeWatering(Long id) {
+        Plant plant = getPlantById(id);
+        LocalDate baseDate = plant.getNextWaterDate();
+        if (baseDate == null || baseDate.isBefore(LocalDate.now())) {
+            baseDate = LocalDate.now();
+        }
+        
+        // Push forward by 1 day
+        plant.setNextWaterDate(baseDate.plusDays(1));
+        
+        // If it was overdue, it's not anymore because we pushed the date
         if ("Water Overdue".equals(plant.getPlantStatus())) {
             plant.setPlantStatus("Healthy");
         }
@@ -265,10 +289,12 @@ public class PlantService {
     public PlantSummary getPlantSummary() {
         List<Plant> allPlants = plantRepository.findAll();
 
+        LocalDate today = LocalDate.now();
         long totalPlants = allPlants.size();
         long needsAttention = allPlants.stream().filter(p -> !"Healthy".equals(p.getPlantStatus())).count();
         long propagating = allPlants.stream().filter(p -> "Propagating".equals(p.getCurrentStage())).count();
         long readyToSell = allPlants.stream().filter(p -> "Ready to Sell".equals(p.getCurrentStage())).count();
+        long needsWatering = allPlants.stream().filter(p -> p.getNextWaterDate() != null && !p.getNextWaterDate().isAfter(today)).count();
         long distinctLocations = allPlants.stream().map(Plant::getLocation).filter(loc -> loc != null && !loc.trim().isEmpty()).distinct().count();
         
         double totalEstimatedValue = allPlants.stream()
@@ -276,12 +302,19 @@ public class PlantService {
                 .mapToDouble(Plant::getPrice)
                 .sum();
 
-        return new PlantSummary(totalPlants, needsAttention, propagating, readyToSell, distinctLocations, totalEstimatedValue);
+        return new PlantSummary(totalPlants, needsAttention, propagating, readyToSell, needsWatering, distinctLocations, totalEstimatedValue);
     }
 
     public List<Plant> searchPlants(String term) {
         if (term == null || term.trim().isEmpty()) {
             return plantRepository.findAll();
+        }
+
+        if ("Need Watering".equalsIgnoreCase(term.trim())) {
+            LocalDate today = LocalDate.now();
+            return plantRepository.findAll().stream()
+                    .filter(p -> p.getNextWaterDate() != null && !p.getNextWaterDate().isAfter(today))
+                    .toList();
         }
 
         try {

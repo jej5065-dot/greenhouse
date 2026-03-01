@@ -51,6 +51,8 @@ public class PlantController {
         existing.setPlantStatus(plant.getPlantStatus());
         existing.setGoodForTerrariums(plant.isGoodForTerrariums());
         existing.setWateringFrequencyDays(plant.getWateringFrequencyDays());
+        existing.setNextWaterDate(plant.getNextWaterDate());
+        existing.setLastWateredDate(plant.getLastWateredDate());
         
         // Update care info (now mostly via type, but kept total prop time)
         existing.setTotalPropagationTime(plant.getTotalPropagationTime());
@@ -59,6 +61,9 @@ public class PlantController {
         existing.setOriginalPurchasePrice(plant.getOriginalPurchasePrice());
         existing.setPrice(plant.getPrice());
         existing.setSoldDate(plant.getSoldDate());
+        
+        // Update other metadata
+        existing.setRotation(plant.getRotation());
 
         return plantService.savePlant(existing);
     }
@@ -72,6 +77,11 @@ public class PlantController {
     @PostMapping("/{id}/water")
     public Plant waterPlant(@PathVariable Long id) {
         return plantService.waterPlant(id);
+    }
+
+    @PostMapping("/{id}/snooze")
+    public Plant snoozeWatering(@PathVariable Long id) {
+        return plantService.snoozeWatering(id);
     }
 
     @PostMapping("/{id}/propagate")

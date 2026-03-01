@@ -35,11 +35,11 @@ dependencies {
 // 1. Build and bundle the frontend into the backend JAR
 task buildFrontend(type: Exec) {
     workingDir 'frontend'
-    // Use absolute path for npm found on system
+    // Use generic npm command found on PATH
     if (System.getProperty('os.name').toLowerCase().contains('windows')) {
         commandLine 'npm.cmd', 'run', 'build'
     } else {
-        commandLine '/opt/homebrew/bin/npm', 'run', 'build'
+        commandLine 'npm', 'run', 'build'
     }
 }
 

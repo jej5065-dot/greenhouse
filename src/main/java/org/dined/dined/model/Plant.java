@@ -90,12 +90,4 @@ public class Plant {
         summary.put("guid", parent.getGuid());
         return summary;
     }
-
-    @PrePersist
-    @PreUpdate
-    public void calculateNextWaterDate() {
-        if (lastWateredDate != null && wateringFrequencyDays != null) {
-            this.nextWaterDate = lastWateredDate.toLocalDate().plusDays(wateringFrequencyDays);
-        }
-    }
 }

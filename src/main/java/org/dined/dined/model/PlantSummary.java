@@ -12,6 +12,7 @@ public class PlantSummary {
     private long needsAttention;
     private long propagating;
     private long readyToSell;
+    private long needsWatering;
     private long distinctLocations;
     private double totalEstimatedValue;
 }

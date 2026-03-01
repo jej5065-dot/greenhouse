@@ -31,7 +31,7 @@ class PlantSchedulerTest {
                 .id(1L)
                 .name("Thirsty Plant")
                 .nextWaterDate(LocalDate.now().minusDays(1))
-                .status("Healthy")
+                .plantStatus("Healthy")
                 .build();
 
         when(plantRepository.findAll()).thenReturn(List.of(plant));
@@ -40,7 +40,7 @@ class PlantSchedulerTest {
         plantScheduler.checkPlantStatus();
 
         // Assert
-        assertThat(plant.getStatus()).isEqualTo("Needs Attention");
+        assertThat(plant.getPlantStatus()).isEqualTo("Water Overdue");
         verify(plantRepository).save(plant);
     }
 
@@ -51,7 +51,7 @@ class PlantSchedulerTest {
                 .id(2L)
                 .name("Happy Plant")
                 .nextWaterDate(LocalDate.now().plusDays(1))
-                .status("Healthy")
+                .plantStatus("Healthy")
                 .build();
 
         when(plantRepository.findAll()).thenReturn(List.of(plant));
@@ -60,7 +60,7 @@ class PlantSchedulerTest {
         plantScheduler.checkPlantStatus();
 
         // Assert
-        assertThat(plant.getStatus()).isEqualTo("Healthy");
+        assertThat(plant.getPlantStatus()).isEqualTo("Healthy");
         verify(plantRepository, never()).save(any(Plant.class));
     }
 
@@ -71,7 +71,7 @@ class PlantSchedulerTest {
                 .id(3L)
                 .name("Today Plant")
                 .nextWaterDate(LocalDate.now())
-                .status("Healthy")
+                .plantStatus("Healthy")
                 .build();
 
         when(plantRepository.findAll()).thenReturn(List.of(plant));
@@ -80,7 +80,7 @@ class PlantSchedulerTest {
         plantScheduler.checkPlantStatus();
 
         // Assert
-        assertThat(plant.getStatus()).isEqualTo("Healthy");
+        assertThat(plant.getPlantStatus()).isEqualTo("Healthy");
         verify(plantRepository, never()).save(any(Plant.class));
     }
 
@@ -91,7 +91,7 @@ class PlantSchedulerTest {
                 .id(4L)
                 .name("Already Thirsty Plant")
                 .nextWaterDate(LocalDate.now().minusDays(1))
-                .status("Needs Attention")
+                .plantStatus("Needs Attention")
                 .build();
 
         when(plantRepository.findAll()).thenReturn(List.of(plant));
@@ -100,7 +100,7 @@ class PlantSchedulerTest {
         plantScheduler.checkPlantStatus();
 
         // Assert
-        assertThat(plant.getStatus()).isEqualTo("Needs Attention");
+        assertThat(plant.getPlantStatus()).isEqualTo("Needs Attention");
         verify(plantRepository, never()).save(any(Plant.class));
     }
 
@@ -111,7 +111,7 @@ class PlantSchedulerTest {
                 .id(5L)
                 .name("Null Date Plant")
                 .nextWaterDate(null)
-                .status("Healthy")
+                .plantStatus("Healthy")
                 .build();
 
         when(plantRepository.findAll()).thenReturn(List.of(plant));
@@ -120,7 +120,7 @@ class PlantSchedulerTest {
         plantScheduler.checkPlantStatus();
 
         // Assert
-        assertThat(plant.getStatus()).isEqualTo("Healthy");
+        assertThat(plant.getPlantStatus()).isEqualTo("Healthy");
         verify(plantRepository, never()).save(any(Plant.class));
     }
 

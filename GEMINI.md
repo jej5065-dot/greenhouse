@@ -8,6 +8,12 @@ A full-stack application for managing plant inventory, tracking watering schedul
 - **Frontend**: React (TypeScript) + Vite + Material UI
 - **Storage**: Local `uploads/` directory for plant photos
 
+## Engineering Guidelines
+
+### Verification Priority
+- **Backend First**: Always verify that the backend builds successfully (e.g., `./gradlew compileJava` or `./gradlew build`) before attempting to start the frontend or verify local server availability. 
+- **Fail Fast**: If the backend build fails, stop immediately, fix the compilation or test errors, and do not waste time waiting for frontend processes until the core system is stable.
+
 ## Getting Started
 
 ### Prerequisites

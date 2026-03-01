@@ -92,9 +92,9 @@ public class PlantIntegrationTest {
 
     @Test
     public void testGetSummary() {
-        plantRepository.save(Plant.builder().name("P1").status("Active").price(10.0).build());
-        plantRepository.save(Plant.builder().name("P2").status("Needs Attention").price(20.0).build());
-        plantRepository.save(Plant.builder().name("P3").status("Propagating").build());
+        plantRepository.save(Plant.builder().name("P1").currentStage("Active").price(10.0).build());
+        plantRepository.save(Plant.builder().name("P2").plantStatus("Needs Attention").price(20.0).build());
+        plantRepository.save(Plant.builder().name("P3").currentStage("Propagating").build());
 
         ResponseEntity<Object> response = restTemplate.getForEntity("/api/plants/summary", Object.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
