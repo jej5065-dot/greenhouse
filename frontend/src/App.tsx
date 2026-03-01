@@ -764,25 +764,53 @@ function App() {
         {summary && (
           <Grid container spacing={2} sx={{ mb: 4 }}>
             <Grid item xs={6} sm={3}>
-              <Card elevation={1} sx={{ p: 2, textAlign: 'center' }}>
+              <Card 
+                elevation={1} 
+                sx={{ 
+                  p: 2, textAlign: 'center', cursor: 'pointer', transition: '0.3s',
+                  '&:hover': { transform: 'translateY(-2px)', boxShadow: 3, bgcolor: '#f1f8e9' } 
+                }}
+                onClick={() => { setSearchTerm(''); fetchPlants(''); }}
+              >
                 <Typography variant="h5" color="primary" sx={{ fontWeight: 'bold' }}>{summary.totalPlants}</Typography>
                 <Typography variant="caption" color="textSecondary">Total Plants</Typography>
               </Card>
             </Grid>
             <Grid item xs={6} sm={3}>
-              <Card elevation={1} sx={{ p: 2, textAlign: 'center' }}>
+              <Card 
+                elevation={1} 
+                sx={{ 
+                  p: 2, textAlign: 'center', cursor: 'pointer', transition: '0.3s',
+                  '&:hover': { transform: 'translateY(-2px)', boxShadow: 3, bgcolor: '#fffde7' } 
+                }}
+                onClick={() => { setSearchTerm('Needs Attention'); fetchPlants('Needs Attention'); }}
+              >
                 <Typography variant="h5" color="warning.main" sx={{ fontWeight: 'bold' }}>{summary.needsAttention}</Typography>
                 <Typography variant="caption" color="textSecondary">Needs Attention</Typography>
               </Card>
             </Grid>
             <Grid item xs={6} sm={3}>
-              <Card elevation={1} sx={{ p: 2, textAlign: 'center' }}>
+              <Card 
+                elevation={1} 
+                sx={{ 
+                  p: 2, textAlign: 'center', cursor: 'pointer', transition: '0.3s',
+                  '&:hover': { transform: 'translateY(-2px)', boxShadow: 3, bgcolor: '#f3e5f5' } 
+                }}
+                onClick={() => { setSearchTerm('Propagating'); fetchPlants('Propagating'); }}
+              >
                 <Typography variant="h5" color="secondary" sx={{ fontWeight: 'bold' }}>{summary.propagating}</Typography>
                 <Typography variant="caption" color="textSecondary">Propagating</Typography>
               </Card>
             </Grid>
             <Grid item xs={6} sm={3}>
-              <Card elevation={1} sx={{ p: 2, textAlign: 'center' }}>
+              <Card 
+                elevation={1} 
+                sx={{ 
+                  p: 2, textAlign: 'center', cursor: 'pointer', transition: '0.3s',
+                  '&:hover': { transform: 'translateY(-2px)', boxShadow: 3, bgcolor: '#e8f5e9' } 
+                }}
+                onClick={() => { setSearchTerm('Ready to Sell'); fetchPlants('Ready to Sell'); }}
+              >
                 <Typography variant="h5" color="success.main" sx={{ fontWeight: 'bold' }}>${summary.totalEstimatedValue.toFixed(2)}</Typography>
                 <Typography variant="caption" color="textSecondary">Estimated Value</Typography>
               </Card>
