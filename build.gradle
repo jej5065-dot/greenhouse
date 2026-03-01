@@ -39,7 +39,7 @@ task buildFrontend(type: Exec) {
     if (System.getProperty('os.name').toLowerCase().contains('windows')) {
         commandLine 'npm.cmd', 'run', 'build'
     } else {
-        commandLine 'npm', 'run', 'build'
+        commandLine '/opt/homebrew/bin/npm', 'run', 'build'
     }
 }
 
@@ -54,10 +54,10 @@ processResources.dependsOn copyFrontend
 
 // 2. Deployment configuration
 ext {
-    remoteUser = 'jason'
-    remoteHost = '192.168.68.94'
+    remoteUser = 'jjones'
+    remoteHost = '192.168.68.86'
     jarName = 'greenhouse.jar'
-    deployDir = '/opt/greenhouse'
+    deployDir = 'greenhouse'
 }
 
 task deployToRemote(type: Exec) {
@@ -71,10 +71,10 @@ task deployToRemote(type: Exec) {
         scp -o StrictHostKeyChecking=no "${jarPath}" ${remoteUser}@${remoteHost}:${deployDir}/${jarName}
         
         echo ">> Restarting Greenhouse service..."
-        ssh -o StrictHostKeyChecking=no ${remoteUser}@${remoteHost} "sudo systemctl restart greenhouse"
+        ssh -o StrictHostKeyChecking=no ${remoteUser}@${remoteHost} "systemctl --user restart greenhouse"
         
         echo ">> Deployment Successful! App will be available on http://${remoteHost}:3000"
-        echo ">> You can check logs with: ssh ${remoteUser}@${remoteHost} 'journalctl -u greenhouse -f'"
+        echo ">> You can check logs with: ssh ${remoteUser}@${remoteHost} 'journalctl --user -u greenhouse -f'"
     """
 }
 
