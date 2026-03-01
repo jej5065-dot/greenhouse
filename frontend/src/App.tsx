@@ -20,7 +20,7 @@ import 'react-quill/dist/quill.snow.css'
 import { 
   RotateCw, MessageSquare, History, Check, X, Camera as CameraIcon,
   Image as GalleryIcon, ChevronLeft, ChevronRight, FileUp, Skull,
-  Download, RefreshCw, Trash2 as TrashIcon
+  Download, RefreshCw, Trash2 as TrashIcon, AlarmClock
 } from 'lucide-react'
 import PlantLibraryDialog from './components/PlantLibraryDialog';
 
@@ -78,6 +78,7 @@ interface PlantSummary {
   needsAttention: number;
   propagating: number;
   readyToSell: number;
+  needsWatering: number;
   distinctLocations: number;
   totalEstimatedValue: number;
 }
@@ -324,6 +325,17 @@ function App() {
       fetchSummary();
       if (selectedPlant?.id === id) handleViewDetails(id);
     } catch (error) { showError('Failed to log watering.'); }
+    finally { setIsProcessing(false); }
+  };
+
+  const handleSnooze = async (id: number) => {
+    setIsProcessing(true);
+    try {
+      await axios.post(`/api/plants/${id}/snooze`);
+      fetchPlants(searchTerm);
+      fetchSummary();
+      if (selectedPlant?.id === id) handleViewDetails(id);
+    } catch (error) { showError('Failed to snooze watering.'); }
     finally { setIsProcessing(false); }
   };
 
@@ -807,21 +819,21 @@ function App() {
                 elevation={1} 
                 sx={{ 
                   p: 2, textAlign: 'center', cursor: 'pointer', transition: '0.3s',
-                  '&:hover': { transform: 'translateY(-2px)', boxShadow: 3, bgcolor: '#e8f5e9' } 
+                  '&:hover': { transform: 'translateY(-2px)', boxShadow: 3, bgcolor: '#e3f2fd' }
                 }}
-                onClick={() => { setSearchTerm('Ready to Sell'); fetchPlants('Ready to Sell'); }}
+                onClick={() => { setSearchTerm('Need Watering'); fetchPlants('Need Watering'); }}
               >
-                <Typography variant="h5" color="success.main" sx={{ fontWeight: 'bold' }}>${summary.totalEstimatedValue.toFixed(2)}</Typography>
-                <Typography variant="caption" color="textSecondary">Estimated Value</Typography>
+                <Typography variant="h5" color="info.main" sx={{ fontWeight: 'bold' }}>{summary.needsWatering}</Typography>
+                <Typography variant="caption" color="textSecondary">To Water Today</Typography>
               </Card>
             </Grid>
           </Grid>
         )}
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button variant="contained" size="small" startIcon={<AlertCircle />} onClick={() => fetchPlants('Needs Attention')} color="warning">Needs Attention</Button>
-            <Button variant="outlined" size="small" startIcon={<Droplet />} onClick={() => fetchPlants('Watering soon')}>Due</Button>
-            <Button variant="text" size="small" onClick={() => fetchPlants('')}>All</Button>
+            <Button variant="contained" size="small" startIcon={<AlertCircle />} onClick={() => { setSearchTerm('Needs Attention'); fetchPlants('Needs Attention'); }} color="warning">Needs Attention</Button>
+            <Button variant="outlined" size="small" startIcon={<Droplet />} onClick={() => { setSearchTerm('Need Watering'); fetchPlants('Need Watering'); }}>Due</Button>
+            <Button variant="text" size="small" onClick={() => { setSearchTerm(''); fetchPlants(''); }}>All</Button>
           </Box>
           
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -922,6 +934,7 @@ function App() {
                   <CardActions sx={{ px: 2, pb: 2, justifyContent: 'space-between' }}>
                     <Box>
                       <Tooltip title="Water Now"><IconButton size="small" color="primary" onClick={(e) => {e.stopPropagation(); handleWater(plant.id)}} disabled={isProcessing}><Droplet size={18} /></IconButton></Tooltip>
+                      <Tooltip title="Snooze 1 Day"><IconButton size="small" color="info" onClick={(e) => {e.stopPropagation(); handleSnooze(plant.id)}} disabled={isProcessing}><AlarmClock size={18} /></IconButton></Tooltip>
                       <Tooltip title="Propagate"><IconButton size="small" color="secondary" onClick={(e) => {e.stopPropagation(); handlePropagate(plant.id)}} disabled={isProcessing}><Scissors size={18} /></IconButton></Tooltip>
                     </Box>
                     <IconButton size="small" onClick={(e) => {e.stopPropagation(); triggerUpload(plant.id)}} disabled={isProcessing}><Camera size={18} /></IconButton>
@@ -1019,6 +1032,7 @@ function App() {
                     </TableCell>
                     <TableCell align="right">
                       <IconButton size="small" onClick={(e) => {e.stopPropagation(); handleWater(plant.id)}}><Droplet size={16} /></IconButton>
+                      <Tooltip title="Snooze 1 Day"><IconButton size="small" onClick={(e) => {e.stopPropagation(); handleSnooze(plant.id)}}><AlarmClock size={16} /></IconButton></Tooltip>
                       <IconButton size="small" onClick={(e) => {e.stopPropagation(); triggerUpload(plant.id)}}><CameraIcon size={16} /></IconButton>
                     </TableCell>
                   </TableRow>
@@ -1038,7 +1052,12 @@ function App() {
                 <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{selectedPlant.name}</Typography>
                 <Typography variant="caption" color="textSecondary">#{selectedPlant.id} | GUID: {selectedPlant.guid}</Typography>
               </Box>
-              <IconButton color="error" onClick={() => triggerDelete(selectedPlant.id)}><Trash2 size={20} /></IconButton>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                <Tooltip title="Water Now"><IconButton size="small" color="primary" onClick={() => handleWater(selectedPlant.id)} disabled={isProcessing}><Droplet size={20} /></IconButton></Tooltip>
+                <Tooltip title="Snooze 1 Day"><IconButton size="small" color="info" onClick={() => handleSnooze(selectedPlant.id)} disabled={isProcessing}><AlarmClock size={20} /></IconButton></Tooltip>
+                <Tooltip title="Propagate"><IconButton size="small" color="secondary" onClick={() => handlePropagate(selectedPlant.id)} disabled={isProcessing}><Scissors size={20} /></IconButton></Tooltip>
+                <IconButton color="error" onClick={() => triggerDelete(selectedPlant.id)}><Trash2 size={20} /></IconButton>
+              </Box>
             </DialogTitle>
             <DialogContent sx={{ minHeight: 500 }}>
               <Tabs value={detailTab} onChange={(_, v) => setDetailTab(v)} sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }} variant="scrollable" scrollButtons="auto">
@@ -1118,14 +1137,39 @@ function App() {
                   <Grid item xs={12} sm={6}>
                     <Autocomplete freeSolo options={locations} value={selectedPlant.location} onInputChange={(_, n) => setSelectedPlant({...selectedPlant, location: n})} renderInput={(p) => <TextField {...p} label="Location" size="small" />} />
                   </Grid>
-                  <Grid item xs={12} sm={6}>
+                  <Grid item xs={12} sm={4}>
                     <Autocomplete options={['Active', 'Propagating', 'Ready to Sell', 'Sold']} value={selectedPlant.currentStage} onChange={(_, n) => setSelectedPlant({...selectedPlant, currentStage: n || ''})} renderInput={(p) => <TextField {...p} label="Growth Stage" size="small" />} />
                   </Grid>
-                  <Grid item xs={12} sm={6}>
+                  <Grid item xs={12} sm={4}>
                     <Autocomplete options={['Healthy', 'Water Overdue', 'Needs Attention']} value={selectedPlant.plantStatus} onChange={(_, n) => setSelectedPlant({...selectedPlant, plantStatus: n || ''})} renderInput={(p) => <TextField {...p} label="Health Status" size="small" />} />
                   </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <Box sx={{
+                      p: 1,
+                      borderRadius: 1,
+                      bgcolor: selectedPlant.nextWaterDate && new Date(selectedPlant.nextWaterDate) <= new Date() ? 'warning.light' : 'success.light',
+                      color: selectedPlant.nextWaterDate && new Date(selectedPlant.nextWaterDate) <= new Date() ? 'warning.contrastText' : 'success.contrastText',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%'
+                    }}>
+                      <Droplet size={18} style={{ marginRight: 8 }} />
+                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                        Next Water: {selectedPlant.nextWaterDate ? new Date(selectedPlant.nextWaterDate).toLocaleDateString() : 'TBD'}
+                      </Typography>
+                    </Box>
+                  </Grid>
                   <Grid item xs={12}><FormControlLabel control={<Checkbox checked={selectedPlant.goodForTerrariums} onChange={(e) => setSelectedPlant({...selectedPlant, goodForTerrariums: e.target.checked})} />} label="Good for Terrariums" /></Grid>
-                  <Grid item xs={12}><TextField fullWidth label="Watering Frequency (Days)" type="number" value={selectedPlant.wateringFrequencyDays} onKeyDown={(e) => {if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) e.preventDefault();}} onChange={(e) => setSelectedPlant({...selectedPlant, wateringFrequencyDays: parseInt(e.target.value) || 0})} size="small" /></Grid>
+                  <Grid item xs={12} sm={6}><TextField fullWidth label="Watering Frequency (Days)" type="number" value={selectedPlant.wateringFrequencyDays} onKeyDown={(e) => {if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) e.preventDefault();}} onChange={(e) => setSelectedPlant({...selectedPlant, wateringFrequencyDays: parseInt(e.target.value) || 0})} size="small" /></Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Next Water Date"
+                      type="date"
+                      InputLabelProps={{ shrink: true }}
+                      value={selectedPlant.nextWaterDate || ''}
+                      onChange={(e) => setSelectedPlant({...selectedPlant, nextWaterDate: e.target.value})}
+                      size="small"
+                    />
+                  </Grid>
                 </Grid>
               )}
 
