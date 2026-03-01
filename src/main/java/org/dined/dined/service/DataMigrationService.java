@@ -41,12 +41,29 @@ public class DataMigrationService {
     public void migrateData() {
         System.out.println(">> Checking for legacy data migrations...");
 
-        // 1. Check if the legacy 'type' column exists in the database
         List<Map<String, Object>> columns = jdbcTemplate.queryForList("PRAGMA table_info(plant)");
         boolean hasLegacyType = columns.stream().anyMatch(c -> "type".equalsIgnoreCase((String) c.get("name")));
+        boolean hasLegacyStatus = columns.stream().anyMatch(c -> "status".equalsIgnoreCase((String) c.get("name")));
 
-        if (!hasLegacyType) {
-            System.out.println(">> No legacy 'type' column found. Migration skipped.");
+        if (!hasLegacyType && !hasLegacyStatus) {
+            System.out.println(">> No legacy columns found requiring migration.");
+            
+            // Still perform default value assignment for new fields if they are null
+            List<Plant> allPlants = plantRepository.findAll();
+            for (Plant plant : allPlants) {
+                boolean updated = false;
+                if (plant.getCurrentStage() == null) {
+                    plant.setCurrentStage("Active");
+                    updated = true;
+                }
+                if (plant.getPlantStatus() == null) {
+                    plant.setPlantStatus("Healthy");
+                    updated = true;
+                }
+                if (updated) {
+                    plantRepository.save(plant);
+                }
+            }
             return;
         }
 
@@ -54,8 +71,8 @@ public class DataMigrationService {
         for (Plant plant : allPlants) {
             boolean updated = false;
 
-            // 2. Migrate Type to PlantType relation
-            if (plant.getPlantType() == null) {
+            // 1. Migrate Type to PlantType relation
+            if (hasLegacyType && plant.getPlantType() == null) {
                 try {
                     String legacyType = jdbcTemplate.queryForObject(
                             "SELECT type FROM plant WHERE id = ?", String.class, plant.getId());
@@ -70,6 +87,37 @@ public class DataMigrationService {
                     }
                 } catch (Exception e) {
                     // Column might be empty or missing for this row
+                }
+            }
+
+            // 2. Migrate Status to currentStage and plantStatus
+            if (plant.getCurrentStage() == null || plant.getPlantStatus() == null) {
+                String legacyStatus = "Active";
+                if (hasLegacyStatus) {
+                    try {
+                        legacyStatus = jdbcTemplate.queryForObject(
+                                "SELECT status FROM plant WHERE id = ?", String.class, plant.getId());
+                    } catch (Exception e) {
+                        legacyStatus = "Active";
+                    }
+                }
+
+                if (plant.getCurrentStage() == null) {
+                    if (legacyStatus != null && (legacyStatus.equals("Propagating") || legacyStatus.equals("Ready to Sell") || legacyStatus.equals("Sold"))) {
+                        plant.setCurrentStage(legacyStatus);
+                    } else {
+                        plant.setCurrentStage("Active");
+                    }
+                    updated = true;
+                }
+
+                if (plant.getPlantStatus() == null) {
+                    if (legacyStatus != null && (legacyStatus.equals("Needs Attention") || legacyStatus.equals("Water Overdue"))) {
+                        plant.setPlantStatus(legacyStatus);
+                    } else {
+                        plant.setPlantStatus("Healthy");
+                    }
+                    updated = true;
                 }
             }
 

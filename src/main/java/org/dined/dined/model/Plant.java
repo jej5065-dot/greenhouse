@@ -59,7 +59,11 @@ public class Plant {
     private LocalDateTime lastWateredDate;
     private String location;
     
-    private String status; // propagating, needs attention, ready to sell, etc.
+    @Builder.Default
+    private String currentStage = "Active"; // e.g. Active, Propagating, Ready to Sell, Sold
+    
+    @Builder.Default
+    private String plantStatus = "Healthy"; // e.g. Healthy, Water Overdue, Needs Attention
     
     private boolean goodForTerrariums;
     private Integer wateringFrequencyDays;

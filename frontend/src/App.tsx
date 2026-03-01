@@ -55,7 +55,8 @@ interface Plant {
   guid: string;
   name: string;
   plantType?: PlantType;
-  status: string;
+  currentStage: string;
+  plantStatus: string;
   nextWaterDate: string;
   lastWateredDate: string;
   location: string;
@@ -204,7 +205,8 @@ function App() {
 
   const [newPlant, setNewPlant] = useState<Partial<Plant>>({ 
     name: '', wateringFrequencyDays: 7, location: '',
-    goodForTerrariums: false, status: 'Active'
+    goodForTerrariums: false, currentStage: 'Active',
+    plantStatus: 'Healthy'
   });
 
   const handleDownload = async (path: string, label?: string) => {
@@ -488,7 +490,14 @@ function App() {
       await fetchPlants();
       await fetchLocations();
       await fetchSummary();
-      setNewPlant({ name: '', wateringFrequencyDays: 7, location: '', goodForTerrariums: false, status: 'Active' });
+      setNewPlant({ 
+        name: '', 
+        wateringFrequencyDays: 7, 
+        location: '', 
+        goodForTerrariums: false, 
+        currentStage: 'Active',
+        plantStatus: 'Healthy'
+      });
       handleViewDetails(createdPlant.id);
       setScrollToId(createdPlant.id);
     } catch (error: any) {
@@ -876,8 +885,8 @@ function App() {
                       <Typography variant="body2" color="textSecondary">{plant.location || 'Unknown'}</Typography>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Droplet size={14} color={plant.status === 'Needs Attention' ? '#ed6c02' : '#2e7d32'} />
-                      <Typography variant="body2" sx={{ fontWeight: 500, color: plant.status === 'Needs Attention' ? 'warning.main' : 'text.primary' }}>
+                      <Droplet size={14} color={plant.plantStatus === 'Needs Attention' || plant.plantStatus === 'Water Overdue' ? '#ed6c02' : '#2e7d32'} />
+                      <Typography variant="body2" sx={{ fontWeight: 500, color: plant.plantStatus === 'Needs Attention' || plant.plantStatus === 'Water Overdue' ? 'warning.main' : 'text.primary' }}>
                         Next: {plant.nextWaterDate ? new Date(plant.nextWaterDate).toLocaleDateString() : 'TBD'}
                       </Typography>
                     </Box>
@@ -915,7 +924,7 @@ function App() {
                        <Typography variant="caption" sx={{ display: 'block', fontWeight: 'bold', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{plant.name}</Typography>
                        <Typography variant="caption" sx={{ fontSize: '0.65rem' }}>#{plant.id}</Typography>
                     </Box>
-                    {plant.status === 'Needs Attention' && (
+                    {(plant.plantStatus === 'Needs Attention' || plant.plantStatus === 'Water Overdue') && (
                       <Box sx={{ position: 'absolute', top: 4, right: 4, bgcolor: 'warning.main', borderRadius: '50%', width: 8, height: 8 }} />
                     )}
                   </Box>
@@ -957,12 +966,20 @@ function App() {
                     <TableCell>{plant.plantType?.name}</TableCell>
                     <TableCell>{plant.location}</TableCell>
                     <TableCell>
-                      <Chip
-                        label={plant.status}
-                        size="small"
-                        color={plant.status === 'Needs Attention' ? 'warning' : (plant.status === 'Propagating' ? 'secondary' : 'default')}
-                        variant="outlined"
-                      />
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <Chip
+                          label={plant.plantStatus}
+                          size="small"
+                          color={plant.plantStatus === 'Needs Attention' || plant.plantStatus === 'Water Overdue' ? 'warning' : 'success'}
+                          variant="outlined"
+                        />
+                        <Chip
+                          label={plant.currentStage}
+                          size="small"
+                          color={plant.currentStage === 'Propagating' ? 'secondary' : 'default'}
+                          variant="filled"
+                        />
+                      </Box>
                     </TableCell>
                     <TableCell>
                       {plant.nextWaterDate && (
@@ -1074,7 +1091,10 @@ function App() {
                     <Autocomplete freeSolo options={locations} value={selectedPlant.location} onInputChange={(_, n) => setSelectedPlant({...selectedPlant, location: n})} renderInput={(p) => <TextField {...p} label="Location" size="small" />} />
                   </Grid>
                   <Grid item xs={12} sm={6}>
-                    <Autocomplete options={['Active', 'Propagating', 'Needs Attention', 'Ready to Sell', 'Sold']} value={selectedPlant.status} onChange={(_, n) => setSelectedPlant({...selectedPlant, status: n || ''})} renderInput={(p) => <TextField {...p} label="Status" size="small" />} />
+                    <Autocomplete options={['Active', 'Propagating', 'Ready to Sell', 'Sold']} value={selectedPlant.currentStage} onChange={(_, n) => setSelectedPlant({...selectedPlant, currentStage: n || ''})} renderInput={(p) => <TextField {...p} label="Growth Stage" size="small" />} />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Autocomplete options={['Healthy', 'Water Overdue', 'Needs Attention']} value={selectedPlant.plantStatus} onChange={(_, n) => setSelectedPlant({...selectedPlant, plantStatus: n || ''})} renderInput={(p) => <TextField {...p} label="Health Status" size="small" />} />
                   </Grid>
                   <Grid item xs={12}><FormControlLabel control={<Checkbox checked={selectedPlant.goodForTerrariums} onChange={(e) => setSelectedPlant({...selectedPlant, goodForTerrariums: e.target.checked})} />} label="Good for Terrariums" /></Grid>
                   <Grid item xs={12}><TextField fullWidth label="Watering Frequency (Days)" type="number" value={selectedPlant.wateringFrequencyDays} onKeyDown={(e) => {if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) e.preventDefault();}} onChange={(e) => setSelectedPlant({...selectedPlant, wateringFrequencyDays: parseInt(e.target.value) || 0})} size="small" /></Grid>

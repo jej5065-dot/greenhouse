@@ -26,10 +26,12 @@ public class PlantScheduler {
 
         for (Plant plant : allPlants) {
             if (plant.getNextWaterDate() != null && plant.getNextWaterDate().isBefore(today)) {
-                if (!"Needs Attention".equals(plant.getStatus())) {
-                    plant.setStatus("Needs Attention");
+                // Only mark as Water Overdue if currently Healthy.
+                // If it's already Needs Attention, leave it alone.
+                if ("Healthy".equals(plant.getPlantStatus())) {
+                    plant.setPlantStatus("Water Overdue");
                     plantRepository.save(plant);
-                    log.info("Updated plant {} (#{}) to 'Needs Attention'.", plant.getName(), plant.getId());
+                    log.info("Updated plant {} (#{}) to 'Water Overdue'.", plant.getName(), plant.getId());
                 }
             }
         }

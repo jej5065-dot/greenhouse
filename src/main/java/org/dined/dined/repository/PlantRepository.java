@@ -18,12 +18,15 @@ public interface PlantRepository extends JpaRepository<Plant, Long> {
            "p.id = :id OR " +
            "p.guid LIKE %:searchTerm% OR " +
            "LOWER(p.name) LIKE LOWER(concat('%', :searchTerm, '%')) OR " +
-           "LOWER(p.status) LIKE LOWER(concat('%', :searchTerm, '%')) OR " +
+           "LOWER(p.currentStage) LIKE LOWER(concat('%', :searchTerm, '%')) OR " +
+           "LOWER(p.plantStatus) LIKE LOWER(concat('%', :searchTerm, '%')) OR " +
            "LOWER(pt.name) LIKE LOWER(concat('%', :searchTerm, '%')) OR " +
            "LOWER(p.location) LIKE LOWER(concat('%', :searchTerm, '%'))")
     List<Plant> search(@Param("searchTerm") String searchTerm, @Param("id") Long id);
 
-    List<Plant> findByStatus(String status);
+    List<Plant> findByCurrentStage(String currentStage);
+    
+    List<Plant> findByPlantStatus(String plantStatus);
     
     @Query("SELECT DISTINCT p.location FROM Plant p WHERE p.location IS NOT NULL")
     List<String> findDistinctLocations();

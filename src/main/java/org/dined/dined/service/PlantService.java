@@ -130,6 +130,10 @@ public class PlantService {
     public Plant waterPlant(Long id) {
         Plant plant = getPlantById(id);
         plant.setLastWateredDate(LocalDateTime.now());
+        // Reset status if it was just water overdue
+        if ("Water Overdue".equals(plant.getPlantStatus())) {
+            plant.setPlantStatus("Healthy");
+        }
         return plantRepository.save(plant);
     }
 
@@ -140,7 +144,8 @@ public class PlantService {
                 .plantType(parent.getPlantType())
                 .parent(parent)
                 .cuttingDate(LocalDate.now())
-                .status("Propagating")
+                .currentStage("Propagating")
+                .plantStatus("Healthy")
                 .location(parent.getLocation())
                 .wateringFrequencyDays(parent.getWateringFrequencyDays())
                 .guid(UUID.randomUUID().toString())
@@ -261,13 +266,13 @@ public class PlantService {
         List<Plant> allPlants = plantRepository.findAll();
 
         long totalPlants = allPlants.size();
-        long needsAttention = allPlants.stream().filter(p -> "Needs Attention".equals(p.getStatus())).count();
-        long propagating = allPlants.stream().filter(p -> "Propagating".equals(p.getStatus())).count();
-        long readyToSell = allPlants.stream().filter(p -> "Ready to Sell".equals(p.getStatus())).count();
+        long needsAttention = allPlants.stream().filter(p -> !"Healthy".equals(p.getPlantStatus())).count();
+        long propagating = allPlants.stream().filter(p -> "Propagating".equals(p.getCurrentStage())).count();
+        long readyToSell = allPlants.stream().filter(p -> "Ready to Sell".equals(p.getCurrentStage())).count();
         long distinctLocations = allPlants.stream().map(Plant::getLocation).filter(loc -> loc != null && !loc.trim().isEmpty()).distinct().count();
         
         double totalEstimatedValue = allPlants.stream()
-                .filter(p -> !"Sold".equals(p.getStatus()) && p.getPrice() != null)
+                .filter(p -> !"Sold".equals(p.getCurrentStage()) && p.getPrice() != null)
                 .mapToDouble(Plant::getPrice)
                 .sum();
 

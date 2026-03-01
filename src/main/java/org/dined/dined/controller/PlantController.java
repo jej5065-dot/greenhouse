@@ -47,7 +47,8 @@ public class PlantController {
         existing.setName(plant.getName());
         existing.setPlantType(plant.getPlantType());
         existing.setLocation(plant.getLocation());
-        existing.setStatus(plant.getStatus());
+        existing.setCurrentStage(plant.getCurrentStage());
+        existing.setPlantStatus(plant.getPlantStatus());
         existing.setGoodForTerrariums(plant.isGoodForTerrariums());
         existing.setWateringFrequencyDays(plant.getWateringFrequencyDays());
         
