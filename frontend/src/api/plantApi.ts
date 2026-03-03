@@ -36,4 +36,5 @@ export const plantApi = {
   importPlantTypes: (formData: FormData) => axios.post('/api/plant-types/import', formData),
   
   identifyPlant: (formData: FormData) => axios.post('/api/plants/identify', formData),
+  identifyExistingPlant: (id: number) => axios.post<any>('/api/plants/identify/' + id),
 };

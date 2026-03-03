@@ -317,6 +317,17 @@ function App() {
     }
   };
 
+  const handleIdentifyExisting = async (id: number) => {
+    try {
+      const res = await plantApi.identifyExistingPlant(id);
+      showAlert('Plant identified successfully!', 'success');
+      return res.data;
+    } catch (err) {
+      showAlert('Failed to identify plant. Ensure your AI configuration is correct.');
+      throw err;
+    }
+  };
+
   return (
     <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: 'background.default' }}>
       <input type="file" accept="image/*" style={{ display: 'none' }} ref={fileInputRef} onChange={handleFileUpload} />
@@ -381,6 +392,7 @@ function App() {
         onSnooze={onSnooze}
         onPropagate={onPropagate}
         onDelete={(id) => { setPlantToDelete(id); setDeleteConfirmOpen(true); }}
+        onIdentify={handleIdentifyExisting}
         onRotateMain={handleRotateMain}
         onDownload={handleDownload}
         onOpenGallery={openGalleryForPlant}

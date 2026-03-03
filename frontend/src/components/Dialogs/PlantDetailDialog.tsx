@@ -8,7 +8,7 @@ import {
 import { 
   Droplet, AlarmClock, Scissors, Trash2, Info, Sprout, History, 
   Settings, DollarSign, Download, RotateCw, Check, ExternalLink,
-  Calendar, Camera as CameraIcon
+  Calendar, Camera as CameraIcon, Brain
 } from 'lucide-react';
 import { Plant, PlantType, PlantUpdate } from '../../types';
 import { getToxicityColor, formatCurrency } from '../../utils/formatUtils';
@@ -23,6 +23,7 @@ interface PlantDetailDialogProps {
   onSnooze: (id: number) => void;
   onPropagate: (id: number) => void;
   onDelete: (id: number) => void;
+  onIdentify: (id: number) => Promise<any>;
   onRotateMain: (id: number, rotation: number) => void;
   onDownload: (path: string, label?: string) => void;
   onOpenGallery: (plant: Plant, path?: string) => void;
@@ -48,6 +49,7 @@ const PlantDetailDialog: React.FC<PlantDetailDialogProps> = ({
   onSnooze,
   onPropagate,
   onDelete,
+  onIdentify,
   onRotateMain,
   onDownload,
   onOpenGallery,
@@ -65,6 +67,7 @@ const PlantDetailDialog: React.FC<PlantDetailDialogProps> = ({
 }) => {
   const [tab, setTab] = useState(initialTab);
   const [editedPlant, setEditedPlant] = useState<Plant | null>(null);
+  const [isIdentifying, setIsIdentifying] = useState(false);
 
   React.useEffect(() => {
     if (plant) {
@@ -79,6 +82,32 @@ const PlantDetailDialog: React.FC<PlantDetailDialogProps> = ({
     onUpdate(editedPlant);
   };
 
+  const handleIdentify = async () => {
+    if (!editedPlant.id) return;
+    setIsIdentifying(true);
+    try {
+      const data = await onIdentify(editedPlant.id);
+      if (data) {
+        setEditedPlant({
+          ...editedPlant,
+          name: editedPlant.name.includes('Cutting') ? editedPlant.name : (data.name || editedPlant.name),
+          wateringFrequencyDays: data.wateringFrequencyDays || editedPlant.wateringFrequencyDays,
+          plantType: {
+            ...editedPlant.plantType,
+            name: data.commonName || editedPlant.plantType?.name || '',
+            scientificName: data.scientificName || editedPlant.plantType?.scientificName || '',
+            petToxicity: data.petToxicity || editedPlant.plantType?.petToxicity || '',
+            careInstructions: data.careInstructions || editedPlant.plantType?.careInstructions || '',
+            propagationInstructions: data.propagationInstructions || editedPlant.plantType?.propagationInstructions || '',
+            defaultWateringFrequencyDays: data.wateringFrequencyDays || editedPlant.plantType?.defaultWateringFrequencyDays || 7
+          } as PlantType
+        });
+      }
+    } finally {
+      setIsIdentifying(false);
+    }
+  };
+
   const toxicityColor = getToxicityColor(editedPlant.plantType?.petToxicity);
 
   return (
@@ -89,6 +118,16 @@ const PlantDetailDialog: React.FC<PlantDetailDialogProps> = ({
           <Typography variant="caption" color="textSecondary">#{editedPlant.id} | GUID: {editedPlant.guid}</Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          <Tooltip title="Identify with AI">
+            <IconButton 
+              size="small" 
+              sx={{ color: 'purple' }} 
+              onClick={handleIdentify} 
+              disabled={isProcessing || isIdentifying || !editedPlant.imagePath}
+            >
+              {isIdentifying ? <CircularProgress size={20} color="inherit" /> : <Brain size={20} />}
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Water Now"><IconButton size="small" color="primary" onClick={() => onWater(editedPlant.id)} disabled={isProcessing}><Droplet size={20} /></IconButton></Tooltip>
           <Tooltip title="Snooze 1 Day"><IconButton size="small" color="info" onClick={() => onSnooze(editedPlant.id)} disabled={isProcessing}><AlarmClock size={20} /></IconButton></Tooltip>
           <Tooltip title="Propagate"><IconButton size="small" color="secondary" onClick={() => onPropagate(editedPlant.id)} disabled={isProcessing}><Scissors size={20} /></IconButton></Tooltip>
