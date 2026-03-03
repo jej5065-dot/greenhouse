@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 @Service
+@lombok.extern.slf4j.Slf4j
 public class PlantAiService {
 
     @Value("${spring.ai.google.ai.api-key}")
@@ -25,7 +26,19 @@ public class PlantAiService {
         this.objectMapper = objectMapper;
     }
 
+    @jakarta.annotation.PostConstruct
+    public void init() {
+        if (apiKey == null || apiKey.isBlank()) {
+            log.error("CRITICAL: Gemini API Key is NOT configured! Please set GEMINI-API-KEY or GEMINI_API_KEY environment variable.");
+        } else {
+            log.info("Gemini AI Service initialized successfully (API Key is present).");
+        }
+    }
+
     public PlantAiIdentificationResponse identifyPlant(Resource imageResource, String userProvidedName) {
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new RuntimeException("Gemini API Key is not configured. Please contact the administrator.");
+        }
         try {
             byte[] imageBytes = imageResource.getContentAsByteArray();
             String base64Image = Base64.getEncoder().encodeToString(imageBytes);
