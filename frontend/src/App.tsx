@@ -303,9 +303,10 @@ function App() {
     } catch (err) { showAlert('CSV Import failed.'); }
   };
 
-  const handleIdentify = async (file: File) => {
+  const handleIdentify = async (file: File, name?: string) => {
     const formData = new FormData();
     formData.append('file', file);
+    if (name) formData.append('name', name);
     try {
       const res = await plantApi.identifyPlant(formData);
       showAlert('Plant identified successfully!', 'success');

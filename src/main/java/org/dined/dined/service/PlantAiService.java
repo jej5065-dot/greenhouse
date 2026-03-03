@@ -25,25 +25,39 @@ public class PlantAiService {
         this.objectMapper = objectMapper;
     }
 
-    public PlantAiIdentificationResponse identifyPlant(Resource imageResource) {
+    public PlantAiIdentificationResponse identifyPlant(Resource imageResource, String userProvidedName) {
         try {
             byte[] imageBytes = imageResource.getContentAsByteArray();
             String base64Image = Base64.getEncoder().encodeToString(imageBytes);
 
-            String prompt = """
-                Identify the plant in this image. 
-                Provide the following information in a clean JSON format:
+            String roleContext = "You are a Master Horticulturist and Botanical Specialist with decades of experience in identifying plants and providing world-class care advice.";
+            
+            String specificTask = (userProvidedName == null || userProvidedName.isBlank()) 
+                ? "Identify the plant in this image." 
+                : "The user believes the plant in this image is a '" + userProvidedName + "'. Validate this identification and provide the care details for this specific species.";
+
+            String prompt = String.format("""
+                %s
+                
+                Task: %s
+                
+                Provide the following information in a clean, valid JSON format:
                 {
-                  "name": "Suggested nickname for this specific plant instance",
-                  "commonName": "Common species name",
-                  "scientificName": "Scientific species name",
-                  "wateringFrequencyDays": 7,
-                  "petToxicity": "Brief description of toxicity to cats and dogs",
-                  "careInstructions": "Short HTML formatted care summary",
-                  "propagationInstructions": "Short HTML formatted propagation guide"
+                  "name": "A catchy nickname for this specific plant instance (e.g., 'Monty the Monstera')",
+                  "commonName": "The standard common name of the species",
+                  "scientificName": "The full Latin scientific name including genus and species",
+                  "wateringFrequencyDays": 7, (An integer representing the average days between waterings for this species in a standard indoor environment)
+                  "petToxicity": "A detailed but concise note on toxicity to cats and dogs (e.g., 'Toxic: contains calcium oxalate crystals')",
+                  "careInstructions": "High-quality HTML formatted care summary. Include sections for <strong>Light</strong>, <strong>Watering</strong>, and <strong>Humidity</strong> using <ul> and <li> tags.",
+                  "propagationInstructions": "A professional HTML formatted guide on how to propagate this specific plant (e.g., water nodes, division, seeds)."
                 }
-                Only return the JSON object, no other text or markdown markers.
-                """;
+                
+                Constraints:
+                - Return ONLY the JSON object.
+                - No markdown code blocks (no ```json).
+                - Ensure the HTML in careInstructions and propagationInstructions is valid and uses standard tags.
+                - If the image is not a plant, return an object with commonName 'Unknown' and a polite message in careInstructions.
+                """, roleContext, specificTask);
 
             Map<String, Object> requestBody = Map.of(
                 "contents", List.of(
@@ -75,16 +89,16 @@ public class PlantAiService {
                     List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
                     if (!parts.isEmpty()) {
                         String text = (String) parts.get(0).get("text");
-                        // Clean markdown if present
-                        text = text.replaceAll("```json", "").replaceAll("```", "").trim();
-                        return objectMapper.readValue(text, PlantAiIdentificationResponse.class);
+                        // Aggressive cleanup of potential markdown or extra text
+                        String jsonOnly = text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1);
+                        return objectMapper.readValue(jsonOnly, PlantAiIdentificationResponse.class);
                     }
                 }
             }
 
-            throw new RuntimeException("Failed to identify plant from AI response");
+            throw new RuntimeException("Failed to parse a valid response from the AI.");
         } catch (Exception e) {
-            throw new RuntimeException("Error during plant identification: " + e.getMessage(), e);
+            throw new RuntimeException("AI Identification Error: " + e.getMessage(), e);
         }
     }
 }

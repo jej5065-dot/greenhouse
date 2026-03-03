@@ -14,7 +14,9 @@ public class PlantAiController {
     private final PlantAiService plantAiService;
 
     @PostMapping
-    public PlantAiIdentificationResponse identifyPlant(@RequestParam("file") MultipartFile file) {
-        return plantAiService.identifyPlant(file.getResource());
+    public PlantAiIdentificationResponse identifyPlant(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "name", required = false) String name) {
+        return plantAiService.identifyPlant(file.getResource(), name);
     }
 }
