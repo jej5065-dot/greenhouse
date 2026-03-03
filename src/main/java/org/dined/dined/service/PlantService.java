@@ -61,8 +61,17 @@ public class PlantService {
         if (plant.getPlantType() != null && plant.getPlantType().getId() == null) {
             String typeName = plant.getPlantType().getName();
             if (typeName != null && !typeName.trim().isEmpty()) {
+                PlantType sentType = plant.getPlantType();
                 PlantType type = plantTypeRepository.findByName(typeName)
-                        .orElseGet(() -> plantTypeRepository.save(PlantType.builder().name(typeName).build()));
+                        .orElseGet(() -> plantTypeRepository.save(PlantType.builder()
+                                .name(typeName)
+                                .scientificName(sentType.getScientificName())
+                                .petToxicity(sentType.getPetToxicity())
+                                .careInstructions(sentType.getCareInstructions())
+                                .propagationInstructions(sentType.getPropagationInstructions())
+                                .defaultWateringFrequencyDays(sentType.getDefaultWateringFrequencyDays() != 0 ? 
+                                        sentType.getDefaultWateringFrequencyDays() : 7)
+                                .build()));
                 plant.setPlantType(type);
             } else {
                 plant.setPlantType(null);

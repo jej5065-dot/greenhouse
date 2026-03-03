@@ -10,7 +10,7 @@ interface QuickAddDialogProps {
   open: boolean;
   onClose: () => void;
   onAdd: (plant: Partial<Plant>, file: File | null) => void;
-  onIdentify: (file: File) => void;
+  onIdentify: (file: File) => Promise<any>;
   plantTypes: PlantType[];
   locations: string[];
   isProcessing: boolean;
@@ -31,9 +31,35 @@ const QuickAddDialog: React.FC<QuickAddDialogProps> = ({
     plantStatus: 'Healthy'
   });
   const [initialFile, setInitialFile] = useState<File | null>(null);
+  const [isIdentifying, setIsIdentifying] = useState(false);
 
   const handleAdd = () => {
     onAdd(newPlant, initialFile);
+  };
+
+  const handleIdentifyClick = async () => {
+    if (!initialFile) return;
+    setIsIdentifying(true);
+    try {
+      const result = await onIdentify(initialFile);
+      if (result) {
+        setNewPlant(prev => ({
+          ...prev,
+          name: result.name || prev.name,
+          wateringFrequencyDays: result.wateringFrequencyDays || prev.wateringFrequencyDays,
+          plantType: {
+            name: result.commonName || result.name,
+            scientificName: result.scientificName,
+            petToxicity: result.petToxicity,
+            careInstructions: result.careInstructions,
+            propagationInstructions: result.propagationInstructions,
+            defaultWateringFrequencyDays: result.wateringFrequencyDays
+          } as any
+        }));
+      }
+    } finally {
+      setIsIdentifying(false);
+    }
   };
 
   const resetAndClose = () => {
@@ -99,10 +125,10 @@ const QuickAddDialog: React.FC<QuickAddDialogProps> = ({
                 color="secondary"
                 size="small"
                 startIcon={<Sparkles size={16} />}
-                onClick={() => onIdentify(initialFile)}
-                disabled={isProcessing}
+                onClick={handleIdentifyClick}
+                disabled={isIdentifying || isProcessing}
               >
-                {isProcessing ? 'Identifying...' : 'Identify with AI'}
+                {isIdentifying ? 'Identifying...' : 'Identify with AI'}
               </Button>
             </Box>
           ) : (
@@ -125,7 +151,7 @@ const QuickAddDialog: React.FC<QuickAddDialogProps> = ({
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={resetAndClose} color="inherit">Cancel</Button>
-        <Button onClick={handleAdd} variant="contained" disabled={isProcessing}>
+        <Button onClick={handleAdd} variant="contained" disabled={isProcessing || isIdentifying}>
           {isProcessing ? 'Adding...' : 'Add Plant'}
         </Button>
       </DialogActions>

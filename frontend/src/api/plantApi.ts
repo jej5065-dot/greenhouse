@@ -34,4 +34,6 @@ export const plantApi = {
   setCoverPhoto: (plantId: number, imageId: number) => axios.post(`/api/plants/${plantId}/cover/${imageId}`),
   
   importPlantTypes: (formData: FormData) => axios.post('/api/plant-types/import', formData),
+  
+  identifyPlant: (formData: FormData) => axios.post('/api/plants/identify', formData),
 };

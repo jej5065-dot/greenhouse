@@ -303,11 +303,17 @@ function App() {
     } catch (err) { showAlert('CSV Import failed.'); }
   };
 
-  const handleIdentify = (file: File) => {
-    showAlert('Identification started (Mock).', 'info');
-    setTimeout(() => {
-      showAlert('Identified as Monstera Deliciosa (Mock)!', 'success');
-    }, 1500);
+  const handleIdentify = async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await plantApi.identifyPlant(formData);
+      showAlert('Plant identified successfully!', 'success');
+      return res.data;
+    } catch (err) {
+      showAlert('Failed to identify plant. Ensure your API key is correct.');
+      throw err;
+    }
   };
 
   return (
