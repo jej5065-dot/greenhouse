@@ -41,7 +41,8 @@ task buildFrontend(type: Exec) {
     if (System.getProperty('os.name').toLowerCase().contains('windows')) {
         commandLine 'npm.cmd', 'run', 'build'
     } else {
-        commandLine 'npm', 'run', 'build'
+        // Try to find npm using which, or use bash -l to load profiles
+        commandLine 'bash', '-c', 'npm run build'
     }
 }
 

@@ -67,17 +67,21 @@ If you want to test the production frontend build using the Node.js proxy server
 
 ## Deployment
 
-To deploy the application to the remote server, use the following Gradle task:
+**Mandatory Procedure**: To deploy the application to the remote server, you **must** use the following Gradle task. Do not perform manual `scp` or `ssh` steps unless the task itself is being debugged.
 
 ```bash
 ./gradlew deployToRemote
 ```
 
-This task will:
-1.  Build the frontend production assets.
-2.  Bundle the frontend into the Spring Boot JAR.
-3.  Upload the JAR to the remote host (`192.168.68.86`).
-4.  Restart the `greenhouse` service on the remote host.
+### Deployment Requirements
+- **Node.js**: `npm` must be available in the environment path where Gradle is running.
+- **SSH Access**: Public key authentication should be configured for `jjones@192.168.68.86`.
+
+This task autonomously handles:
+1.  Building frontend production assets.
+2.  Bundling assets into the Spring Boot JAR.
+3.  Uploading the JAR to the remote host (`192.168.68.86`).
+4.  Restarting the `greenhouse` service.
 
 The remote application is available at `http://192.168.68.86:3000`.
 
