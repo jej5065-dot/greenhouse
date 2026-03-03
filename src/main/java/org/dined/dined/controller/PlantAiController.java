@@ -15,24 +15,32 @@ public class PlantAiController {
     private final org.dined.dined.service.PlantService plantService;
 
     @PostMapping
-    public PlantAiIdentificationResponse identifyPlant(
+    public org.springframework.http.ResponseEntity<?> identifyPlant(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "name", required = false) String name) {
-        return plantAiService.identifyPlant(file.getResource(), name);
+        try {
+            return org.springframework.http.ResponseEntity.ok(plantAiService.identifyPlant(file.getResource(), name));
+        } catch (Exception e) {
+            return org.springframework.http.ResponseEntity.internalServerError().body(e.getMessage());
+        }
     }
 
     @PostMapping("/{id}")
-    public PlantAiIdentificationResponse identifyExistingPlant(@PathVariable Long id) {
-        org.dined.dined.model.Plant plant = plantService.getPlantById(id);
-        if (plant.getImagePath() == null) {
-            throw new RuntimeException("Plant has no image for identification");
+    public org.springframework.http.ResponseEntity<?> identifyExistingPlant(@PathVariable Long id) {
+        try {
+            org.dined.dined.model.Plant plant = plantService.getPlantById(id);
+            if (plant.getImagePath() == null) {
+                throw new RuntimeException("Plant has no image for identification");
+            }
+            
+            java.nio.file.Path imagePath = java.nio.file.Paths.get("uploads", "original_" + plant.getImagePath());
+            if (!java.nio.file.Files.exists(imagePath)) {
+                throw new RuntimeException("Original image file not found");
+            }
+            
+            return org.springframework.http.ResponseEntity.ok(plantAiService.identifyPlant(new org.springframework.core.io.FileSystemResource(imagePath), plant.getName()));
+        } catch (Exception e) {
+            return org.springframework.http.ResponseEntity.internalServerError().body(e.getMessage());
         }
-        
-        java.nio.file.Path imagePath = java.nio.file.Paths.get("uploads", "original_" + plant.getImagePath());
-        if (!java.nio.file.Files.exists(imagePath)) {
-            throw new RuntimeException("Original image file not found");
-        }
-        
-        return plantAiService.identifyPlant(new org.springframework.core.io.FileSystemResource(imagePath), plant.getName());
     }
 }

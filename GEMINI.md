@@ -7,6 +7,7 @@ A full-stack application for managing plant inventory, tracking watering schedul
 - **Database**: SQLite (local `greenhouse.db`)
 - **Frontend**: React (TypeScript) + Vite + Material UI
 - **Storage**: Local `uploads/` directory for plant photos
+- **AI Model**: Google Gemini 3 Flash Preview (`gemini-3-flash-preview`) for plant identification and care advice.
 
 ## Engineering Guidelines
 

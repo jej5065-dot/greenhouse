@@ -56,28 +56,100 @@ public class PlantService {
         return plantRepository.findById(id).orElseThrow(() -> new RuntimeException("Plant not found"));
     }
 
+    @org.springframework.transaction.annotation.Transactional
+    public Plant updatePlant(Long id, Plant plantData) {
+        Plant existing = getPlantById(id);
+        
+        // Update basic fields
+        existing.setName(plantData.getName());
+        existing.setLocation(plantData.getLocation());
+        existing.setCurrentStage(plantData.getCurrentStage());
+        existing.setPlantStatus(plantData.getPlantStatus());
+        existing.setGoodForTerrariums(plantData.isGoodForTerrariums());
+        existing.setWateringFrequencyDays(plantData.getWateringFrequencyDays());
+        existing.setNextWaterDate(plantData.getNextWaterDate());
+        existing.setLastWateredDate(plantData.getLastWateredDate());
+        existing.setTotalPropagationTime(plantData.getTotalPropagationTime());
+        existing.setOriginalPurchasePrice(plantData.getOriginalPurchasePrice());
+        existing.setPrice(plantData.getPrice());
+        existing.setSoldDate(plantData.getSoldDate());
+        existing.setRotation(plantData.getRotation());
+
+        // Handle PlantType logic
+        if (plantData.getPlantType() != null) {
+            PlantType sentType = plantData.getPlantType();
+            PlantType resolvedType = null;
+
+            if (sentType.getId() != null) {
+                // Update existing type
+                resolvedType = plantTypeRepository.findById(sentType.getId()).map(existingType -> {
+                    existingType.setScientificName(sentType.getScientificName());
+                    existingType.setPetToxicity(sentType.getPetToxicity());
+                    existingType.setCareInstructions(sentType.getCareInstructions());
+                    existingType.setPropagationInstructions(sentType.getPropagationInstructions());
+                    if (sentType.getDefaultWateringFrequencyDays() != null && sentType.getDefaultWateringFrequencyDays() != 0) {
+                        existingType.setDefaultWateringFrequencyDays(sentType.getDefaultWateringFrequencyDays());
+                    }
+                    return plantTypeRepository.saveAndFlush(existingType);
+                }).orElse(null);
+            }
+
+            if (resolvedType == null && sentType.getName() != null) {
+                // Try to find by name if ID failed or wasn't provided
+                resolvedType = plantTypeRepository.findByName(sentType.getName()).map(existingType -> {
+                    existingType.setScientificName(sentType.getScientificName());
+                    existingType.setPetToxicity(sentType.getPetToxicity());
+                    existingType.setCareInstructions(sentType.getCareInstructions());
+                    existingType.setPropagationInstructions(sentType.getPropagationInstructions());
+                    if (sentType.getDefaultWateringFrequencyDays() != null && sentType.getDefaultWateringFrequencyDays() != 0) {
+                        existingType.setDefaultWateringFrequencyDays(sentType.getDefaultWateringFrequencyDays());
+                    }
+                    return plantTypeRepository.saveAndFlush(existingType);
+                }).orElseGet(() -> {
+                    return plantTypeRepository.saveAndFlush(PlantType.builder()
+                        .name(sentType.getName())
+                        .scientificName(sentType.getScientificName())
+                        .petToxicity(sentType.getPetToxicity())
+                        .careInstructions(sentType.getCareInstructions())
+                        .propagationInstructions(sentType.getPropagationInstructions())
+                        .defaultWateringFrequencyDays(sentType.getDefaultWateringFrequencyDays() != null && sentType.getDefaultWateringFrequencyDays() != 0 ? 
+                                sentType.getDefaultWateringFrequencyDays() : 7)
+                        .build());
+                });
+            }
+            existing.setPlantType(resolvedType);
+        } else {
+            existing.setPlantType(null);
+        }
+
+        return plantRepository.saveAndFlush(existing);
+    }
+
+    @org.springframework.transaction.annotation.Transactional
     public Plant savePlant(Plant plant) {
-        // Handle dynamic PlantType creation/linking
+        // This is mainly for new plants now
+        if (plant.getId() != null) {
+            return updatePlant(plant.getId(), plant);
+        }
+        
         if (plant.getPlantType() != null && plant.getPlantType().getId() == null) {
             String typeName = plant.getPlantType().getName();
             if (typeName != null && !typeName.trim().isEmpty()) {
                 PlantType sentType = plant.getPlantType();
                 PlantType type = plantTypeRepository.findByName(typeName)
-                        .orElseGet(() -> plantTypeRepository.save(PlantType.builder()
+                        .orElseGet(() -> plantTypeRepository.saveAndFlush(PlantType.builder()
                                 .name(typeName)
                                 .scientificName(sentType.getScientificName())
                                 .petToxicity(sentType.getPetToxicity())
                                 .careInstructions(sentType.getCareInstructions())
                                 .propagationInstructions(sentType.getPropagationInstructions())
-                                .defaultWateringFrequencyDays(sentType.getDefaultWateringFrequencyDays() != 0 ? 
+                                .defaultWateringFrequencyDays(sentType.getDefaultWateringFrequencyDays() != null && sentType.getDefaultWateringFrequencyDays() != 0 ? 
                                         sentType.getDefaultWateringFrequencyDays() : 7)
                                 .build()));
                 plant.setPlantType(type);
-            } else {
-                plant.setPlantType(null);
             }
         }
-        return plantRepository.save(plant);
+        return plantRepository.saveAndFlush(plant);
     }
 
     public void deletePlant(Long id) {

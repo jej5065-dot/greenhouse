@@ -21,10 +21,10 @@ public class PlantType {
     private String otherNames; // Common aliases
     private String petToxicity; // String field as requested
 
-    @Column(length = 2000)
+    @Column(columnDefinition = "TEXT")
     private String careInstructions;
 
-    @Column(length = 2000)
+    @Column(columnDefinition = "TEXT")
     private String propagationInstructions;
 
     private String exampleImagePath;

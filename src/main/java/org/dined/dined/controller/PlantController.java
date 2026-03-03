@@ -41,31 +41,7 @@ public class PlantController {
 
     @PutMapping("/{id}")
     public Plant updatePlant(@PathVariable Long id, @RequestBody Plant plant) {
-        Plant existing = plantService.getPlantById(id);
-        
-        // Update basic fields
-        existing.setName(plant.getName());
-        existing.setPlantType(plant.getPlantType());
-        existing.setLocation(plant.getLocation());
-        existing.setCurrentStage(plant.getCurrentStage());
-        existing.setPlantStatus(plant.getPlantStatus());
-        existing.setGoodForTerrariums(plant.isGoodForTerrariums());
-        existing.setWateringFrequencyDays(plant.getWateringFrequencyDays());
-        existing.setNextWaterDate(plant.getNextWaterDate());
-        existing.setLastWateredDate(plant.getLastWateredDate());
-        
-        // Update care info (now mostly via type, but kept total prop time)
-        existing.setTotalPropagationTime(plant.getTotalPropagationTime());
-        
-        // Update financials
-        existing.setOriginalPurchasePrice(plant.getOriginalPurchasePrice());
-        existing.setPrice(plant.getPrice());
-        existing.setSoldDate(plant.getSoldDate());
-        
-        // Update other metadata
-        existing.setRotation(plant.getRotation());
-
-        return plantService.savePlant(existing);
+        return plantService.updatePlant(id, plant);
     }
 
     @DeleteMapping("/{id}")

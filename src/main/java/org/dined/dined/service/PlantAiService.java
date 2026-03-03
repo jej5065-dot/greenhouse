@@ -18,6 +18,9 @@ public class PlantAiService {
     @Value("${spring.ai.google.ai.api-key}")
     private String apiKey;
 
+    @Value("${spring.ai.google.ai.chat.options.model:gemini-3-flash-preview}")
+    private String model;
+
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
 
@@ -29,9 +32,20 @@ public class PlantAiService {
     @jakarta.annotation.PostConstruct
     public void init() {
         if (apiKey == null || apiKey.isBlank()) {
-            log.error("CRITICAL: Gemini API Key is NOT configured! Please set GEMINI-API-KEY or GEMINI_API_KEY environment variable.");
+            // Fallback to explicit env check for GOOGLE_API_KEY as confirmed by user
+            apiKey = System.getenv("GOOGLE_API_KEY");
+            if (apiKey == null || apiKey.isBlank()) {
+                apiKey = System.getenv("GEMINI-API-KEY");
+            }
+            if (apiKey == null || apiKey.isBlank()) {
+                apiKey = System.getenv("GEMINI_API_KEY");
+            }
+        }
+
+        if (apiKey == null || apiKey.isBlank()) {
+            log.error("CRITICAL: Gemini API Key is NOT configured! Please set GOOGLE_API_KEY environment variable.");
         } else {
-            log.info("Gemini AI Service initialized successfully (API Key is present).");
+            log.info("Gemini AI Service initialized successfully (API Key is present). Using model: {}", model);
         }
     }
 
@@ -44,10 +58,10 @@ public class PlantAiService {
             String base64Image = Base64.getEncoder().encodeToString(imageBytes);
 
             String roleContext = "You are a Master Horticulturist and Botanical Specialist with decades of experience in identifying plants and providing world-class care advice.";
-            
-            String specificTask = (userProvidedName == null || userProvidedName.isBlank()) 
-                ? "Identify the plant in this image." 
-                : "The user believes the plant in this image is a '" + userProvidedName + "'. Validate this identification and provide the care details for this specific species.";
+
+            String specificTask = (userProvidedName == null || userProvidedName.isBlank())
+                    ? "Identify the plant in this image."
+                    : "The user believes the plant in this image is a '" + userProvidedName + "'. Validate this identification and provide the care details for this specific species.";
 
             String prompt = String.format("""
                 %s
@@ -73,20 +87,21 @@ public class PlantAiService {
                 """, roleContext, specificTask);
 
             Map<String, Object> requestBody = Map.of(
-                "contents", List.of(
-                    Map.of("parts", List.of(
-                        Map.of("text", prompt),
-                        Map.of("inline_data", Map.of(
-                            "mime_type", "image/jpeg",
-                            "data", base64Image
-                        ))
-                    ))
-                )
+                    "contents", List.of(
+                            Map.of("parts", List.of(
+                                    Map.of("text", prompt),
+                                    Map.of("inline_data", Map.of(
+                                            "mime_type", "image/jpeg",
+                                            "data", base64Image
+                                    ))
+                            ))
+                    )
             );
 
+            log.info("Calling Gemini API with model: {}", model);
             Map<String, Object> response = webClient.post()
                     .uri(uriBuilder -> uriBuilder
-                            .path("/models/gemini-1.5-flash:generateContent")
+                            .path("/models/" + model + ":generateContent")
                             .queryParam("key", apiKey)
                             .build())
                     .bodyValue(requestBody)
@@ -102,15 +117,22 @@ public class PlantAiService {
                     List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
                     if (!parts.isEmpty()) {
                         String text = (String) parts.get(0).get("text");
+                        log.debug("AI Raw Response: {}", text);
                         // Aggressive cleanup of potential markdown or extra text
-                        String jsonOnly = text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1);
-                        return objectMapper.readValue(jsonOnly, PlantAiIdentificationResponse.class);
+                        int firstBrace = text.indexOf("{");
+                        int lastBrace = text.lastIndexOf("}");
+                        if (firstBrace >= 0 && lastBrace >= 0) {
+                            String jsonOnly = text.substring(firstBrace, lastBrace + 1);
+                            return objectMapper.readValue(jsonOnly, PlantAiIdentificationResponse.class);
+                        }
                     }
                 }
             }
 
+            log.error("Invalid response from Gemini API: {}", response);
             throw new RuntimeException("Failed to parse a valid response from the AI.");
         } catch (Exception e) {
+            log.error("AI Identification Error: ", e);
             throw new RuntimeException("AI Identification Error: " + e.getMessage(), e);
         }
     }
