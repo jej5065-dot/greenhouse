@@ -8,4 +8,6 @@ import java.util.Optional;
 @Repository
 public interface PlantTypeRepository extends JpaRepository<PlantType, Long> {
     Optional<PlantType> findByName(String name);
+    Optional<PlantType> findByNameIgnoreCase(String name);
+    Optional<PlantType> findByScientificNameIgnoreCase(String scientificName);
 }

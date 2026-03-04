@@ -49,7 +49,7 @@ public class PlantAiService {
         }
     }
 
-    public PlantAiIdentificationResponse identifyPlant(Resource imageResource, String userProvidedName) {
+    public PlantAiIdentificationResponse identifyPlant(org.springframework.core.io.Resource imageResource, String userProvidedName, org.dined.dined.model.PlantType existingType) {
         if (apiKey == null || apiKey.isBlank()) {
             throw new RuntimeException("Gemini API Key is not configured. Please contact the administrator.");
         }
@@ -63,10 +63,24 @@ public class PlantAiService {
                     ? "Identify the plant in this image."
                     : "The user believes the plant in this image is a '" + userProvidedName + "'. Validate this identification and provide the care details for this specific species.";
 
+            String enrichmentPrompt = "";
+            if (existingType != null) {
+                enrichmentPrompt = String.format("""
+                    
+                    Existing database information for this type:
+                    - Scientific Name: %s
+                    - Current Care Instructions: %s
+                    - Current Propagation Instructions: %s
+                    
+                    Task Update: Please validate if the existing information is accurate. If the care or propagation instructions are missing, inadequate, or incorrect, provide professional replacements in the JSON response. If they are already high-quality and accurate, you may reuse or slightly refine them.
+                    """, existingType.getScientificName(), existingType.getCareInstructions(), existingType.getPropagationInstructions());
+            }
+
             String prompt = String.format("""
                 %s
                 
                 Task: %s
+                %s
                 
                 Provide the following information in a clean, valid JSON format:
                 {
@@ -84,7 +98,7 @@ public class PlantAiService {
                 - No markdown code blocks (no ```json).
                 - Ensure the HTML in careInstructions and propagationInstructions is valid and uses standard tags.
                 - If the image is not a plant, return an object with commonName 'Unknown' and a polite message in careInstructions.
-                """, roleContext, specificTask);
+                """, roleContext, specificTask, enrichmentPrompt);
 
             Map<String, Object> requestBody = Map.of(
                     "contents", List.of(
@@ -134,6 +148,76 @@ public class PlantAiService {
         } catch (Exception e) {
             log.error("AI Identification Error: ", e);
             throw new RuntimeException("AI Identification Error: " + e.getMessage(), e);
+        }
+    }
+
+    public PlantAiIdentificationResponse identifyPlantByName(String plantTypeName) {
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new RuntimeException("Gemini API Key is not configured.");
+        }
+        try {
+            String prompt = String.format("""
+                You are a Master Horticulturist. Provide botanical details for the plant type: '%s'.
+                
+                Provide the following information in a clean, valid JSON format:
+                {
+                  "name": "A catchy nickname for this specific plant instance",
+                  "commonName": "The standard common name",
+                  "scientificName": "The full Latin scientific name",
+                  "wateringFrequencyDays": 7,
+                  "petToxicity": "Concise note on toxicity",
+                  "careInstructions": "HTML formatted care summary with <strong>Light</strong>, <strong>Watering</strong>, and <strong>Humidity</strong>.",
+                  "propagationInstructions": "HTML formatted guide on how to propagate."
+                }
+                
+                Constraints:
+                - Return ONLY the JSON object.
+                - No markdown code blocks (no ```json).
+                - If you absolutely cannot identify this as a real plant species, return an object with commonName 'Unknown'.
+                """, plantTypeName);
+
+            Map<String, Object> requestBody = Map.of(
+                "contents", List.of(
+                    Map.of("parts", List.of(Map.of("text", prompt)))
+                )
+            );
+
+            log.info("Calling Gemini API for name identification: {}", plantTypeName);
+            Map<String, Object> response = webClient.post()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/models/" + model + ":generateContent")
+                            .queryParam("key", apiKey)
+                            .build())
+                    .bodyValue(requestBody)
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .block();
+
+            if (response != null && response.containsKey("candidates")) {
+                List<Map<String, Object>> candidates = (List<Map<String, Object>>) response.get("candidates");
+                if (!candidates.isEmpty()) {
+                    Map<String, Object> candidate = candidates.get(0);
+                    Map<String, Object> content = (Map<String, Object>) candidate.get("content");
+                    List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
+                    if (!parts.isEmpty()) {
+                        String text = (String) parts.get(0).get("text");
+                        int firstBrace = text.indexOf("{");
+                        int lastBrace = text.lastIndexOf("}");
+                        if (firstBrace >= 0 && lastBrace >= 0) {
+                            String jsonOnly = text.substring(firstBrace, lastBrace + 1);
+                            PlantAiIdentificationResponse res = objectMapper.readValue(jsonOnly, PlantAiIdentificationResponse.class);
+                            if ("Unknown".equalsIgnoreCase(res.getCommonName())) {
+                                throw new RuntimeException("Unable to find plant type: " + plantTypeName);
+                            }
+                            return res;
+                        }
+                    }
+                }
+            }
+            throw new RuntimeException("Unable to find plant type: " + plantTypeName);
+        } catch (Exception e) {
+            log.error("AI Name Identification Error: ", e);
+            throw new RuntimeException(e.getMessage());
         }
     }
 }

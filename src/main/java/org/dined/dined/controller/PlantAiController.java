@@ -19,7 +19,7 @@ public class PlantAiController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "name", required = false) String name) {
         try {
-            return org.springframework.http.ResponseEntity.ok(plantAiService.identifyPlant(file.getResource(), name));
+            return org.springframework.http.ResponseEntity.ok(plantAiService.identifyPlant(file.getResource(), name, null));
         } catch (Exception e) {
             return org.springframework.http.ResponseEntity.internalServerError().body(e.getMessage());
         }
@@ -37,8 +37,19 @@ public class PlantAiController {
             if (!java.nio.file.Files.exists(imagePath)) {
                 throw new RuntimeException("Original image file not found");
             }
+
+            // Only pass existing type for enrichment if instructions are missing
+            org.dined.dined.model.PlantType type = plant.getPlantType();
+            boolean needsEnrichment = type != null && (
+                type.getCareInstructions() == null || type.getCareInstructions().isBlank() ||
+                type.getPropagationInstructions() == null || type.getPropagationInstructions().isBlank()
+            );
             
-            return org.springframework.http.ResponseEntity.ok(plantAiService.identifyPlant(new org.springframework.core.io.FileSystemResource(imagePath), plant.getName()));
+            return org.springframework.http.ResponseEntity.ok(plantAiService.identifyPlant(
+                new org.springframework.core.io.FileSystemResource(imagePath), 
+                plant.getName(), 
+                needsEnrichment ? type : null
+            ));
         } catch (Exception e) {
             return org.springframework.http.ResponseEntity.internalServerError().body(e.getMessage());
         }

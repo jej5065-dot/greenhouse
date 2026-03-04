@@ -28,6 +28,7 @@ interface PlantDetailDialogProps {
   onDownload: (path: string, label?: string) => void;
   onOpenGallery: (plant: Plant, path?: string) => void;
   onAddPhoto: () => void;
+  onUploadPhotoToUpdate: (updateId: number) => void;
   onDeleteUpdate: (update: PlantUpdate) => void;
   onDeleteImage: (imageId: number) => void;
   onRotateImage: (imageId: number, rotation: number) => void;
@@ -54,6 +55,7 @@ const PlantDetailDialog: React.FC<PlantDetailDialogProps> = ({
   onDownload,
   onOpenGallery,
   onAddPhoto,
+  onUploadPhotoToUpdate,
   onDeleteUpdate,
   onDeleteImage,
   onRotateImage,
@@ -302,6 +304,7 @@ const PlantDetailDialog: React.FC<PlantDetailDialogProps> = ({
                       {formatDisplayDate(update.date)}
                     </Typography>
                     <Box>
+                      <IconButton size="small" onClick={() => onUploadPhotoToUpdate(update.id)} title="Add Photo to this day"><CameraIcon size={16} /></IconButton>
                       <IconButton size="small" onClick={() => onEditUpdate(update)}><Settings size={16} /></IconButton>
                       <IconButton size="small" color="error" onClick={() => onDeleteUpdate(update)}><Trash2 size={16} /></IconButton>
                     </Box>

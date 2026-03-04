@@ -260,21 +260,32 @@ function App() {
     } catch (err) { showAlert('Upload failed. Image might be too large.'); }
   };
 
-  const handleSaveUpdate = async (update: Partial<PlantUpdate>) => {
+  const handleSaveUpdate = async (update: Partial<PlantUpdate>, file: File | null) => {
     if (!selectedPlant) return;
     try {
+      let updateId: number;
       if (editingUpdate) {
         await plantApi.updateUpdate(editingUpdate.id, update);
+        updateId = editingUpdate.id;
         setEditingUpdate(null);
       } else {
         const today = getLocalDateString();
         if (update.date! > today) return showAlert('Cannot log future dates.');
         const existing = (selectedPlant.updates || []).find(u => u.date === update.date);
         if (existing) return showAlert('Entry for this date already exists.');
-        await plantApi.addUpdate(selectedPlant.id, update);
-        setUpdateDialogOpen(false);
+        const res = await plantApi.addUpdate(selectedPlant.id, update);
+        updateId = res.data.id;
       }
+
+      if (file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        await plantApi.uploadImage(updateId, formData);
+      }
+
+      setUpdateDialogOpen(false);
       handleViewDetails(selectedPlant.id, 2);
+      fetchPlants(searchTerm);
       showAlert('History updated.', 'success');
     } catch (err) { showAlert('Failed to save update.'); }
   };
@@ -404,6 +415,10 @@ function App() {
           } else {
             setUpdateDialogOpen(true);
           }
+        }}
+        onUploadPhotoToUpdate={(updateId) => {
+          setUploadingToUpdateId(updateId);
+          fileInputRef.current?.click();
         }}
         onDeleteUpdate={(u) => { setUpdateToDelete(u); setDeleteUpdateConfirmOpen(true); }}
         onDeleteImage={async (id) => {

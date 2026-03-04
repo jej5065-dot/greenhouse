@@ -8,16 +8,21 @@ import lombok.*;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Table(indexes = {
+    @Index(name = "idx_plant_type_scientific_name", columnList = "scientificName")
+})
 public class PlantType {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, nullable = false)
-    private String name; // e.g. "Monstera Deliciosa"
+    @Column(nullable = false)
+    private String name; // Common name, e.g. "Swiss Cheese Plant"
 
-    private String scientificName;
+    @Column(unique = true, nullable = false)
+    private String scientificName; // e.g. "Monstera Deliciosa"
+
     private String otherNames; // Common aliases
     private String petToxicity; // String field as requested
 

@@ -56,6 +56,9 @@ public class PlantService {
         return plantRepository.findById(id).orElseThrow(() -> new RuntimeException("Plant not found"));
     }
 
+    @Autowired
+    private PlantAiService plantAiService;
+
     @org.springframework.transaction.annotation.Transactional
     public Plant updatePlant(Long id, Plant plantData) {
         Plant existing = getPlantById(id);
@@ -81,12 +84,20 @@ public class PlantService {
             PlantType resolvedType = null;
 
             if (sentType.getId() != null) {
-                // Update existing type
+                // Update existing type by ID
                 resolvedType = plantTypeRepository.findById(sentType.getId()).map(existingType -> {
+                    if (sentType.getName() != null) existingType.setName(sentType.getName());
                     existingType.setScientificName(sentType.getScientificName());
                     existingType.setPetToxicity(sentType.getPetToxicity());
-                    existingType.setCareInstructions(sentType.getCareInstructions());
-                    existingType.setPropagationInstructions(sentType.getPropagationInstructions());
+                    
+                    // Only update instructions if they are missing
+                    if (existingType.getCareInstructions() == null || existingType.getCareInstructions().isBlank()) {
+                        existingType.setCareInstructions(sentType.getCareInstructions());
+                    }
+                    if (existingType.getPropagationInstructions() == null || existingType.getPropagationInstructions().isBlank()) {
+                        existingType.setPropagationInstructions(sentType.getPropagationInstructions());
+                    }
+
                     if (sentType.getDefaultWateringFrequencyDays() != null && sentType.getDefaultWateringFrequencyDays() != 0) {
                         existingType.setDefaultWateringFrequencyDays(sentType.getDefaultWateringFrequencyDays());
                     }
@@ -94,28 +105,75 @@ public class PlantService {
                 }).orElse(null);
             }
 
-            if (resolvedType == null && sentType.getName() != null) {
-                // Try to find by name if ID failed or wasn't provided
-                resolvedType = plantTypeRepository.findByName(sentType.getName()).map(existingType -> {
-                    existingType.setScientificName(sentType.getScientificName());
-                    existingType.setPetToxicity(sentType.getPetToxicity());
-                    existingType.setCareInstructions(sentType.getCareInstructions());
-                    existingType.setPropagationInstructions(sentType.getPropagationInstructions());
-                    if (sentType.getDefaultWateringFrequencyDays() != null && sentType.getDefaultWateringFrequencyDays() != 0) {
-                        existingType.setDefaultWateringFrequencyDays(sentType.getDefaultWateringFrequencyDays());
+            if (resolvedType == null) {
+                // Prioritize Scientific Name for lookup
+                if (sentType.getScientificName() != null && !sentType.getScientificName().isBlank()) {
+                    resolvedType = plantTypeRepository.findByScientificNameIgnoreCase(sentType.getScientificName()).map(existingType -> {
+                        if (sentType.getName() != null) existingType.setName(sentType.getName());
+                        existingType.setScientificName(sentType.getScientificName());
+                        existingType.setPetToxicity(sentType.getPetToxicity());
+                        
+                        // Only update instructions if they are missing
+                        if (existingType.getCareInstructions() == null || existingType.getCareInstructions().isBlank()) {
+                            existingType.setCareInstructions(sentType.getCareInstructions());
+                        }
+                        if (existingType.getPropagationInstructions() == null || existingType.getPropagationInstructions().isBlank()) {
+                            existingType.setPropagationInstructions(sentType.getPropagationInstructions());
+                        }
+
+                        if (sentType.getDefaultWateringFrequencyDays() != null && sentType.getDefaultWateringFrequencyDays() != 0) {
+                            existingType.setDefaultWateringFrequencyDays(sentType.getDefaultWateringFrequencyDays());
+                        }
+                        return plantTypeRepository.saveAndFlush(existingType);
+                    }).orElse(null);
+                }
+                
+                // Fallback to Name if scientific name lookup failed
+                if (resolvedType == null && sentType.getName() != null && !sentType.getName().isBlank()) {
+                    resolvedType = plantTypeRepository.findByNameIgnoreCase(sentType.getName()).map(existingType -> {
+                        existingType.setScientificName(sentType.getScientificName());
+                        existingType.setPetToxicity(sentType.getPetToxicity());
+                        
+                        // Only update instructions if they are missing
+                        if (existingType.getCareInstructions() == null || existingType.getCareInstructions().isBlank()) {
+                            existingType.setCareInstructions(sentType.getCareInstructions());
+                        }
+                        if (existingType.getPropagationInstructions() == null || existingType.getPropagationInstructions().isBlank()) {
+                            existingType.setPropagationInstructions(sentType.getPropagationInstructions());
+                        }
+
+                        if (sentType.getDefaultWateringFrequencyDays() != null && sentType.getDefaultWateringFrequencyDays() != 0) {
+                            existingType.setDefaultWateringFrequencyDays(sentType.getDefaultWateringFrequencyDays());
+                        }
+                        return plantTypeRepository.saveAndFlush(existingType);
+                    }).orElse(null);
+                }
+
+                // Create new if still not found
+                if (resolvedType == null) {
+                    // Try to use AI to find details by name if scientific name is missing
+                    if (sentType.getScientificName() == null || sentType.getScientificName().isBlank()) {
+                        org.dined.dined.model.PlantAiIdentificationResponse aiData = plantAiService.identifyPlantByName(sentType.getName());
+                        resolvedType = plantTypeRepository.saveAndFlush(PlantType.builder()
+                            .name(aiData.getCommonName())
+                            .scientificName(aiData.getScientificName())
+                            .petToxicity(aiData.getPetToxicity())
+                            .careInstructions(aiData.getCareInstructions())
+                            .propagationInstructions(aiData.getPropagationInstructions())
+                            .defaultWateringFrequencyDays(aiData.getWateringFrequencyDays())
+                            .build());
+                    } else {
+                        resolvedType = plantTypeRepository.saveAndFlush(PlantType.builder()
+                            .name(sentType.getName() != null ? sentType.getName() : sentType.getScientificName())
+                            .scientificName(sentType.getScientificName())
+                            .petToxicity(sentType.getPetToxicity())
+                            .careInstructions(sentType.getCareInstructions())
+                            .propagationInstructions(sentType.getPropagationInstructions())
+                            .defaultWateringFrequencyDays(sentType.getDefaultWateringFrequencyDays() != null && sentType.getDefaultWateringFrequencyDays() != 0 ? 
+                                    sentType.getDefaultWateringFrequencyDays() : 7)
+                            .build());
                     }
-                    return plantTypeRepository.saveAndFlush(existingType);
-                }).orElseGet(() -> {
-                    return plantTypeRepository.saveAndFlush(PlantType.builder()
-                        .name(sentType.getName())
-                        .scientificName(sentType.getScientificName())
-                        .petToxicity(sentType.getPetToxicity())
-                        .careInstructions(sentType.getCareInstructions())
-                        .propagationInstructions(sentType.getPropagationInstructions())
-                        .defaultWateringFrequencyDays(sentType.getDefaultWateringFrequencyDays() != null && sentType.getDefaultWateringFrequencyDays() != 0 ? 
-                                sentType.getDefaultWateringFrequencyDays() : 7)
-                        .build());
-                });
+                }
             }
             existing.setPlantType(resolvedType);
         } else {
@@ -133,21 +191,46 @@ public class PlantService {
         }
         
         if (plant.getPlantType() != null && plant.getPlantType().getId() == null) {
-            String typeName = plant.getPlantType().getName();
-            if (typeName != null && !typeName.trim().isEmpty()) {
-                PlantType sentType = plant.getPlantType();
-                PlantType type = plantTypeRepository.findByName(typeName)
-                        .orElseGet(() -> plantTypeRepository.saveAndFlush(PlantType.builder()
-                                .name(typeName)
-                                .scientificName(sentType.getScientificName())
-                                .petToxicity(sentType.getPetToxicity())
-                                .careInstructions(sentType.getCareInstructions())
-                                .propagationInstructions(sentType.getPropagationInstructions())
-                                .defaultWateringFrequencyDays(sentType.getDefaultWateringFrequencyDays() != null && sentType.getDefaultWateringFrequencyDays() != 0 ? 
-                                        sentType.getDefaultWateringFrequencyDays() : 7)
-                                .build()));
-                plant.setPlantType(type);
+            PlantType sentType = plant.getPlantType();
+            PlantType resolvedType = null;
+
+            // Prioritize Scientific Name
+            if (sentType.getScientificName() != null && !sentType.getScientificName().isBlank()) {
+                resolvedType = plantTypeRepository.findByScientificNameIgnoreCase(sentType.getScientificName()).orElse(null);
             }
+
+            // Fallback to Name
+            if (resolvedType == null && sentType.getName() != null && !sentType.getName().isBlank()) {
+                resolvedType = plantTypeRepository.findByNameIgnoreCase(sentType.getName()).orElse(null);
+            }
+
+            // Create new if not found
+            if (resolvedType == null) {
+                // Try to use AI to find details by name if scientific name is missing
+                if (sentType.getScientificName() == null || sentType.getScientificName().isBlank()) {
+                    org.dined.dined.model.PlantAiIdentificationResponse aiData = plantAiService.identifyPlantByName(sentType.getName());
+                    resolvedType = plantTypeRepository.saveAndFlush(PlantType.builder()
+                        .name(aiData.getCommonName())
+                        .scientificName(aiData.getScientificName())
+                        .petToxicity(aiData.getPetToxicity())
+                        .careInstructions(aiData.getCareInstructions())
+                        .propagationInstructions(aiData.getPropagationInstructions())
+                        .defaultWateringFrequencyDays(aiData.getWateringFrequencyDays())
+                        .build());
+                } else {
+                    resolvedType = plantTypeRepository.saveAndFlush(PlantType.builder()
+                        .name(sentType.getName() != null ? sentType.getName() : sentType.getScientificName())
+                        .scientificName(sentType.getScientificName())
+                        .petToxicity(sentType.getPetToxicity())
+                        .careInstructions(sentType.getCareInstructions())
+                        .propagationInstructions(sentType.getPropagationInstructions())
+                        .defaultWateringFrequencyDays(sentType.getDefaultWateringFrequencyDays() != null && sentType.getDefaultWateringFrequencyDays() != 0 ? 
+                                sentType.getDefaultWateringFrequencyDays() : 7)
+                        .build());
+                }
+            }
+            
+            plant.setPlantType(resolvedType);
         }
         return plantRepository.saveAndFlush(plant);
     }

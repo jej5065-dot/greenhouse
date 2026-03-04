@@ -35,7 +35,10 @@ public class PlantIntegrationTest {
 
     @Test
     public void testCreateAndGetPlant() {
-        PlantType type = PlantType.builder().name("Monstera").build();
+        PlantType type = PlantType.builder()
+                .name("Monstera")
+                .scientificName("Monstera deliciosa")
+                .build();
         type = plantTypeRepository.save(type);
 
         Plant plant = Plant.builder()
@@ -55,6 +58,33 @@ public class PlantIntegrationTest {
     }
 
     @Test
+    public void testPlantTypeScientificNameIdentification() {
+        // 1. Create a plant type
+        PlantType type = PlantType.builder()
+                .name("Swiss Cheese Plant")
+                .scientificName("Monstera deliciosa")
+                .build();
+        plantTypeRepository.save(type);
+
+        // 2. Create a new plant with a DIFFERENT common name but the SAME scientific name
+        // The backend should find the existing type by scientific name
+        Plant plant = Plant.builder()
+                .name("New Monstera Instance")
+                .plantType(PlantType.builder()
+                        .name("Monstera") // Different common name
+                        .scientificName("monstera deliciosa") // Same scientific name (case insensitive)
+                        .build())
+                .build();
+
+        ResponseEntity<Plant> response = restTemplate.postForEntity("/api/plants", plant, Plant.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        
+        Plant savedPlant = response.getBody();
+        assertThat(savedPlant.getPlantType().getId()).isEqualTo(type.getId());
+        assertThat(savedPlant.getPlantType().getName()).isEqualTo("Swiss Cheese Plant");
+    }
+
+    @Test
     public void testWaterPlant() {
         Plant plant = Plant.builder()
                 .name("Thirsty Fern")
@@ -71,7 +101,10 @@ public class PlantIntegrationTest {
     @Test
     @Disabled("Fails with NPE during deserialization of nested parent object - pre-existing issue")
     public void testPropagatePlant() {
-        PlantType type = PlantType.builder().name("Pothos").build();
+        PlantType type = PlantType.builder()
+                .name("Pothos")
+                .scientificName("Epipremnum aureum")
+                .build();
         type = plantTypeRepository.save(type);
 
         Plant parent = Plant.builder()

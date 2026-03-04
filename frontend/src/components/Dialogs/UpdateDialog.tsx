@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Dialog, DialogTitle, DialogContent, DialogActions, TextField, 
-  Typography, Button, CircularProgress 
+  Typography, Button, CircularProgress, Box, IconButton
 } from '@mui/material';
-import { History } from 'lucide-react';
+import { History, Camera as CameraIcon, X } from 'lucide-react';
 import { PlantUpdate } from '../../types';
 import { getLocalDateString } from '../../utils/dateUtils';
 
 interface UpdateDialogProps {
   open: boolean;
   onClose: () => void;
-  onSave: (update: Partial<PlantUpdate>) => void;
+  onSave: (update: Partial<PlantUpdate>, file: File | null) => void;
   editingUpdate: PlantUpdate | null;
   isProcessing: boolean;
 }
@@ -24,6 +24,7 @@ const UpdateDialog: React.FC<UpdateDialogProps> = ({
 }) => {
   const [date, setDate] = useState(getLocalDateString());
   const [notes, setNotes] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (editingUpdate) {
@@ -33,10 +34,11 @@ const UpdateDialog: React.FC<UpdateDialogProps> = ({
       setDate(getLocalDateString());
       setNotes('');
     }
+    setSelectedFile(null);
   }, [editingUpdate, open]);
 
   const handleSave = () => {
-    onSave({ date, notes });
+    onSave({ date, notes }, selectedFile);
   };
 
   return (
@@ -51,6 +53,31 @@ const UpdateDialog: React.FC<UpdateDialogProps> = ({
             Record today's progress, notes, and photos for your plant.
           </Typography>
         )}
+
+        <Box sx={{ mt: 1, mb: 3, p: 2, border: '1px dashed #ccc', borderRadius: 2, textAlign: 'center', bgcolor: '#fafafa' }}>
+          {selectedFile ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+              <Typography variant="body2" noWrap sx={{ maxWidth: 150, fontWeight: 500 }}>{selectedFile.name}</Typography>
+              <IconButton size="small" color="error" onClick={() => setSelectedFile(null)}><X size={14} /></IconButton>
+            </Box>
+          ) : (
+            <Button 
+              variant="outlined" 
+              size="small" 
+              startIcon={<CameraIcon size={16} />} 
+              onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.onchange = (e: any) => setSelectedFile(e.target.files[0]);
+                input.click();
+              }}
+            >
+              Attach Photo
+            </Button>
+          )}
+        </Box>
+
         <TextField 
           fullWidth label="Entry Date" type="date" sx={{ mt: 1 }}
           InputLabelProps={{ shrink: true }}

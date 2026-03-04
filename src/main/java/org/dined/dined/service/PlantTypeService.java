@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Service
+@lombok.extern.slf4j.Slf4j
 public class PlantTypeService {
 
     @Autowired
@@ -71,12 +72,20 @@ public class PlantTypeService {
 
             for (CSVRecord record : csvRecords) {
                 String typeName = record.get("Plant Type");
+                String scientificName = record.get("Scientific Name");
                 
-                PlantType plantType = plantTypeRepository.findByName(typeName)
-                        .orElse(new PlantType());
+                if (scientificName == null || scientificName.isBlank()) {
+                    log.warn("Skipping record with missing Scientific Name: {}", typeName);
+                    continue;
+                }
 
-                plantType.setName(typeName);
-                plantType.setScientificName(record.get("Scientific Name"));
+                // Prioritize Scientific Name for lookup
+                PlantType plantType = plantTypeRepository.findByScientificNameIgnoreCase(scientificName)
+                        .orElseGet(() -> plantTypeRepository.findByNameIgnoreCase(typeName)
+                                .orElse(new PlantType()));
+
+                plantType.setName(typeName != null && !typeName.isBlank() ? typeName : scientificName);
+                plantType.setScientificName(scientificName);
                 plantType.setOtherNames(record.isMapped("Other Names") ? record.get("Other Names") : "");
                 plantType.setPetToxicity(record.get("Pet Toxicity"));
                 plantType.setCareInstructions(record.get("Care Instructions"));
@@ -84,7 +93,11 @@ public class PlantTypeService {
                 
                 String freqStr = record.get("Watering Frequency (Days)");
                 if (freqStr != null && !freqStr.isEmpty()) {
-                    plantType.setDefaultWateringFrequencyDays(Integer.parseInt(freqStr));
+                    try {
+                        plantType.setDefaultWateringFrequencyDays(Integer.parseInt(freqStr));
+                    } catch (NumberFormatException e) {
+                        log.warn("Invalid watering frequency for {}: {}", scientificName, freqStr);
+                    }
                 }
 
                 plantTypeRepository.save(plantType);

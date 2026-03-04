@@ -79,8 +79,11 @@ public class DataMigrationService {
                     
                     if (legacyType != null && !legacyType.trim().isEmpty()) {
                         String finalLegacyType = legacyType;
-                        PlantType type = plantTypeRepository.findByName(legacyType)
-                                .orElseGet(() -> plantTypeRepository.save(PlantType.builder().name(finalLegacyType).build()));
+                        PlantType type = plantTypeRepository.findByNameIgnoreCase(legacyType)
+                                .orElseGet(() -> plantTypeRepository.save(PlantType.builder()
+                                        .name(finalLegacyType)
+                                        .scientificName(finalLegacyType) // Fallback for mandatory field
+                                        .build()));
                         plant.setPlantType(type);
                         updated = true;
                         System.out.println(">> Migrated type '" + legacyType + "' for plant #" + plant.getId());

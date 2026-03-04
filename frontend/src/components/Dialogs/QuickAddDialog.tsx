@@ -164,6 +164,26 @@ const QuickAddDialog: React.FC<QuickAddDialogProps> = ({
             return o.name || '';
           }} 
           value={newPlant.plantType || null}
+          onInputChange={(_, n) => {
+            if (!n) {
+              setNewPlant({ ...newPlant, plantType: undefined });
+              return;
+            }
+            // Check if this name matches an existing type
+            const existing = plantTypes.find(t => t.name?.toLowerCase() === n.toLowerCase());
+            if (existing) {
+              setNewPlant({
+                ...newPlant,
+                plantType: existing,
+                wateringFrequencyDays: existing.defaultWateringFrequencyDays || 7
+              });
+            } else {
+              setNewPlant({
+                ...newPlant,
+                plantType: { name: n } as any
+              });
+            }
+          }}
           onChange={(_, n) => {
             let val: any = n;
             if (typeof n === 'string') {
