@@ -11,8 +11,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -23,6 +25,29 @@ public class PlantServiceTest {
 
     @InjectMocks
     private PlantService plantService;
+
+    @Test
+    public void testGetPlantById_Found() {
+        Plant expectedPlant = Plant.builder().id(1L).name("Test Plant").build();
+        when(plantRepository.findById(1L)).thenReturn(Optional.of(expectedPlant));
+
+        Plant actualPlant = plantService.getPlantById(1L);
+
+        assertEquals(expectedPlant, actualPlant);
+        assertEquals(1L, actualPlant.getId());
+        assertEquals("Test Plant", actualPlant.getName());
+    }
+
+    @Test
+    public void testGetPlantById_NotFound() {
+        when(plantRepository.findById(2L)).thenReturn(Optional.empty());
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            plantService.getPlantById(2L);
+        });
+
+        assertEquals("Plant not found", exception.getMessage());
+    }
 
     @Test
     public void testGetPlantSummary_HappyPath() {
