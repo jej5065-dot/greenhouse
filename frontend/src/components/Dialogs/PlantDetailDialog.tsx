@@ -90,9 +90,12 @@ const PlantDetailDialog: React.FC<PlantDetailDialogProps> = ({
     try {
       const data = await onIdentify(editedPlant.id);
       if (data) {
+        // Only update name if it's empty or whitespace
+        const shouldUpdateName = !editedPlant.name || editedPlant.name.trim() === '';
+        
         setEditedPlant({
           ...editedPlant,
-          name: editedPlant.name.includes('Cutting') ? editedPlant.name : (data.name || editedPlant.name),
+          name: shouldUpdateName ? (data.name || editedPlant.name) : editedPlant.name,
           wateringFrequencyDays: data.wateringFrequencyDays || editedPlant.wateringFrequencyDays,
           plantType: {
             ...editedPlant.plantType,

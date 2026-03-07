@@ -52,7 +52,7 @@ const QuickAddDialog: React.FC<QuickAddDialogProps> = ({
         setCorrectionName('');
         setNewPlant(prev => ({
           ...prev,
-          name: result.name || prev.name,
+          name: prev.name && prev.name.trim() !== '' ? prev.name : (result.name || prev.name),
           wateringFrequencyDays: result.wateringFrequencyDays || prev.wateringFrequencyDays,
           plantType: {
             name: result.commonName || result.name,
