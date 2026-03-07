@@ -9,10 +9,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -74,5 +77,64 @@ public class PlantServiceTest {
         assertEquals(0, summary.getReadyToSell());
         assertEquals(1, summary.getDistinctLocations()); // Only "Room"
         assertEquals(30.0, summary.getTotalEstimatedValue(), 0.001); // 10 + 20
+    }
+
+    @Test
+    public void testSnoozeWatering_NullNextWaterDate() {
+        Long plantId = 1L;
+        Plant plant = Plant.builder().id(plantId).nextWaterDate(null).plantStatus("Healthy").build();
+
+        when(plantRepository.findById(plantId)).thenReturn(Optional.of(plant));
+        when(plantRepository.save(any(Plant.class))).thenAnswer(i -> i.getArguments()[0]);
+
+        Plant result = plantService.snoozeWatering(plantId);
+
+        assertEquals(LocalDate.now().plusDays(1), result.getNextWaterDate());
+        assertEquals("Healthy", result.getPlantStatus());
+    }
+
+    @Test
+    public void testSnoozeWatering_PastNextWaterDate() {
+        Long plantId = 1L;
+        LocalDate pastDate = LocalDate.now().minusDays(3);
+        Plant plant = Plant.builder().id(plantId).nextWaterDate(pastDate).plantStatus("Healthy").build();
+
+        when(plantRepository.findById(plantId)).thenReturn(Optional.of(plant));
+        when(plantRepository.save(any(Plant.class))).thenAnswer(i -> i.getArguments()[0]);
+
+        Plant result = plantService.snoozeWatering(plantId);
+
+        assertEquals(LocalDate.now().plusDays(1), result.getNextWaterDate());
+        assertEquals("Healthy", result.getPlantStatus());
+    }
+
+    @Test
+    public void testSnoozeWatering_FutureNextWaterDate() {
+        Long plantId = 1L;
+        LocalDate futureDate = LocalDate.now().plusDays(5);
+        Plant plant = Plant.builder().id(plantId).nextWaterDate(futureDate).plantStatus("Healthy").build();
+
+        when(plantRepository.findById(plantId)).thenReturn(Optional.of(plant));
+        when(plantRepository.save(any(Plant.class))).thenAnswer(i -> i.getArguments()[0]);
+
+        Plant result = plantService.snoozeWatering(plantId);
+
+        assertEquals(futureDate.plusDays(1), result.getNextWaterDate());
+        assertEquals("Healthy", result.getPlantStatus());
+    }
+
+    @Test
+    public void testSnoozeWatering_WaterOverdueStatus() {
+        Long plantId = 1L;
+        LocalDate pastDate = LocalDate.now().minusDays(2);
+        Plant plant = Plant.builder().id(plantId).nextWaterDate(pastDate).plantStatus("Water Overdue").build();
+
+        when(plantRepository.findById(plantId)).thenReturn(Optional.of(plant));
+        when(plantRepository.save(any(Plant.class))).thenAnswer(i -> i.getArguments()[0]);
+
+        Plant result = plantService.snoozeWatering(plantId);
+
+        assertEquals(LocalDate.now().plusDays(1), result.getNextWaterDate());
+        assertEquals("Healthy", result.getPlantStatus());
     }
 }
