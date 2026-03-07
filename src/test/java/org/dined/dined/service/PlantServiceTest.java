@@ -13,6 +13,8 @@ import java.util.Arrays;
 import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -74,5 +76,14 @@ public class PlantServiceTest {
         assertEquals(0, summary.getReadyToSell());
         assertEquals(1, summary.getDistinctLocations()); // Only "Room"
         assertEquals(30.0, summary.getTotalEstimatedValue(), 0.001); // 10 + 20
+    }
+
+    @Test
+    public void testDeletePlant() {
+        Long plantId = 1L;
+
+        plantService.deletePlant(plantId);
+
+        verify(plantRepository, times(1)).deleteById(plantId);
     }
 }
