@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Dialog, DialogTitle, DialogContent, DialogActions, 
-  Typography, TextField, Button, CircularProgress 
+  Typography, TextField, Button, CircularProgress, useTheme, useMediaQuery, IconButton, Box
 } from '@mui/material';
+import { X } from 'lucide-react';
 
 interface LabelDialogProps {
   open: boolean;
@@ -20,6 +21,8 @@ const LabelDialog: React.FC<LabelDialogProps> = ({
   isProcessing
 }) => {
   const [label, setLabel] = useState(initialLabel);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   useEffect(() => {
     setLabel(initialLabel);
@@ -30,8 +33,21 @@ const LabelDialog: React.FC<LabelDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle sx={{ fontWeight: 'bold', color: 'primary.main' }}>Edit Photo Label</DialogTitle>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="xs"
+      fullScreen={isMobile}
+    >
+      <DialogTitle sx={{ fontWeight: 'bold', color: 'primary.main', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        Edit Photo Label
+        {isMobile && (
+          <IconButton onClick={onClose} size="small" edge="end">
+            <X size={24} />
+          </IconButton>
+        )}
+      </DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
           Provide a short label for this photo (e.g., "Top Down", "New Leaf").

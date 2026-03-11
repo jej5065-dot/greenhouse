@@ -1,9 +1,9 @@
 import React from 'react';
 import { 
   Dialog, DialogTitle, DialogContent, DialogActions, 
-  Typography, Button, CircularProgress 
+  Typography, Button, CircularProgress, useTheme, useMediaQuery, IconButton
 } from '@mui/material';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, X } from 'lucide-react';
 
 interface ConfirmationDialogProps {
   open: boolean;
@@ -28,11 +28,27 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   confirmColor = 'primary',
   isProcessing = false
 }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs">
-      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: `${confirmColor}.main`, fontWeight: 'bold' }}>
-        <AlertCircle />
-        {title}
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="xs"
+      fullWidth
+      fullScreen={isMobile}
+    >
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: `${confirmColor}.main`, fontWeight: 'bold' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <AlertCircle />
+          {title}
+        </div>
+        {isMobile && (
+          <IconButton onClick={onClose} size="small" edge="end">
+            <X size={24} />
+          </IconButton>
+        )}
       </DialogTitle>
       <DialogContent>
         <Typography variant="body1">{message}</Typography>

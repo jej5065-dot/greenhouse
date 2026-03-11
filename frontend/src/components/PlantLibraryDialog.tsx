@@ -4,7 +4,7 @@ import {
   Button, TextField, Grid, Typography, IconButton,
   Box, CircularProgress, Card, CardContent, CardMedia,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
-  Tooltip
+  Tooltip, useTheme, useMediaQuery
 } from '@mui/material';
 import {
   Plus, Trash2, Edit2, Upload, X, Sprout, AlertCircle, Check
@@ -37,6 +37,9 @@ export default function PlantLibraryDialog({ open, onClose }: PlantLibraryDialog
   const [imageFile, setImageFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   useEffect(() => {
     if (open) {
@@ -114,15 +117,28 @@ export default function PlantLibraryDialog({ open, onClose }: PlantLibraryDialog
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg">
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="lg"
+      fullScreen={isMobile}
+    >
       <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Sprout />
           <Typography variant="h6" fontWeight="bold">Master Plant Library</Typography>
         </Box>
-        <Button variant="contained" startIcon={<Plus size={18} />} onClick={handleAddNew}>
-          Add New Species
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button variant="contained" startIcon={<Plus size={18} />} onClick={handleAddNew} size={isMobile ? "small" : "medium"}>
+            {isMobile ? "Add" : "Add New Species"}
+          </Button>
+          {isMobile && (
+            <IconButton onClick={onClose} size="small" edge="end">
+              <X size={24} />
+            </IconButton>
+          )}
+        </Box>
       </DialogTitle>
       <DialogContent dividers>
         {editingType ? (
@@ -238,8 +254,8 @@ export default function PlantLibraryDialog({ open, onClose }: PlantLibraryDialog
                 <TableRow sx={{ bgcolor: '#f5f5f5' }}>
                   <TableCell width={60}>Image</TableCell>
                   <TableCell>Common Name</TableCell>
-                  <TableCell>Scientific Name</TableCell>
-                  <TableCell>Toxicity</TableCell>
+                  {!isMobile && <TableCell>Scientific Name</TableCell>}
+                  {!isMobile && <TableCell>Toxicity</TableCell>}
                   <TableCell align="right">Actions</TableCell>
                 </TableRow>
               </TableHead>
@@ -261,18 +277,27 @@ export default function PlantLibraryDialog({ open, onClose }: PlantLibraryDialog
                         </Box>
                       )}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 500 }}>{type.name}</TableCell>
-                    <TableCell sx={{ fontStyle: 'italic', color: 'text.secondary' }}>{type.scientificName}</TableCell>
-                    <TableCell>
-                       {type.petToxicity && (
-                         <Tooltip title={type.petToxicity}>
-                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                             <AlertCircle size={14} color={type.petToxicity.toLowerCase().includes('safe') ? 'green' : 'orange'} />
-                             <Typography variant="caption" noWrap sx={{ maxWidth: 150, display: 'block' }}>{type.petToxicity}</Typography>
-                           </Box>
-                         </Tooltip>
-                       )}
+                    <TableCell sx={{ fontWeight: 500 }}>
+                      {type.name}
+                      {isMobile && type.scientificName && (
+                        <Typography variant="caption" display="block" color="textSecondary" sx={{ fontStyle: 'italic' }}>
+                          {type.scientificName}
+                        </Typography>
+                      )}
                     </TableCell>
+                    {!isMobile && <TableCell sx={{ fontStyle: 'italic', color: 'text.secondary' }}>{type.scientificName}</TableCell>}
+                    {!isMobile && (
+                      <TableCell>
+                         {type.petToxicity && (
+                           <Tooltip title={type.petToxicity}>
+                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                               <AlertCircle size={14} color={type.petToxicity.toLowerCase().includes('safe') ? 'green' : 'orange'} />
+                               <Typography variant="caption" noWrap sx={{ maxWidth: 150, display: 'block' }}>{type.petToxicity}</Typography>
+                             </Box>
+                           </Tooltip>
+                         )}
+                      </TableCell>
+                    )}
                     <TableCell align="right">
                       <IconButton size="small" onClick={() => handleEdit(type)}><Edit2 size={16} /></IconButton>
                       {confirmDeleteId === type.id ? (

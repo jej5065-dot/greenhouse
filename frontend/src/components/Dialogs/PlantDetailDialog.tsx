@@ -3,12 +3,12 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography, 
   IconButton, Tooltip, Tabs, Tab, Grid, TextField, Autocomplete, 
   FormControlLabel, Checkbox, Button, CircularProgress, Divider,
-  InputAdornment, Card, CardContent, Chip
+  InputAdornment, Card, CardContent, Chip, useTheme, useMediaQuery
 } from '@mui/material';
 import { 
   Droplet, AlarmClock, Scissors, Trash2, Info, Sprout, History, 
   Settings, DollarSign, Download, RotateCw, Check, ExternalLink,
-  Calendar, Camera as CameraIcon, Brain
+  Calendar, Camera as CameraIcon, Brain, X
 } from 'lucide-react';
 import { Plant, PlantType, PlantUpdate } from '../../types';
 import { getToxicityColor, formatCurrency } from '../../utils/formatUtils';
@@ -71,6 +71,9 @@ const PlantDetailDialog: React.FC<PlantDetailDialogProps> = ({
   const [editedPlant, setEditedPlant] = useState<Plant | null>(null);
   const [isIdentifying, setIsIdentifying] = useState(false);
 
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   React.useEffect(() => {
     if (plant) {
       setEditedPlant(plant);
@@ -116,31 +119,64 @@ const PlantDetailDialog: React.FC<PlantDetailDialogProps> = ({
   const toxicityColor = getToxicityColor(editedPlant.plantType?.petToxicity);
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="sm"
+      fullScreen={isMobile}
+    >
       <DialogTitle sx={{ pb: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'primary.main' }}>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{editedPlant.name}</Typography>
+        <Box sx={{ overflow: 'hidden' }}>
+          <Typography variant="h5" sx={{ fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{editedPlant.name}</Typography>
           <Typography variant="caption" color="textSecondary">#{editedPlant.id} | GUID: {editedPlant.guid}</Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-          <Tooltip title="Identify with AI">
-            <IconButton 
-              size="small" 
-              sx={{ color: 'purple' }} 
-              onClick={handleIdentify} 
-              disabled={isProcessing || isIdentifying || !editedPlant.imagePath}
-            >
-              {isIdentifying ? <CircularProgress size={20} color="inherit" /> : <Brain size={20} />}
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Water Now"><IconButton size="small" color="primary" onClick={() => onWater(editedPlant.id)} disabled={isProcessing}><Droplet size={20} /></IconButton></Tooltip>
-          <Tooltip title="Snooze 1 Day"><IconButton size="small" color="info" onClick={() => onSnooze(editedPlant.id)} disabled={isProcessing}><AlarmClock size={20} /></IconButton></Tooltip>
-          <Tooltip title="Propagate"><IconButton size="small" color="secondary" onClick={() => onPropagate(editedPlant.id)} disabled={isProcessing}><Scissors size={20} /></IconButton></Tooltip>
-          <IconButton color="error" onClick={() => onDelete(editedPlant.id)}><Trash2 size={20} /></IconButton>
+        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
+          {isMobile && (
+             <IconButton onClick={onClose} size="small" edge="end" sx={{ ml: 1 }}>
+               <X size={24} />
+             </IconButton>
+          )}
+          {!isMobile && (
+            <>
+              <Tooltip title="Identify with AI">
+                <IconButton
+                  size="small"
+                  sx={{ color: 'purple' }}
+                  onClick={handleIdentify}
+                  disabled={isProcessing || isIdentifying || !editedPlant.imagePath}
+                >
+                  {isIdentifying ? <CircularProgress size={20} color="inherit" /> : <Brain size={20} />}
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Water Now"><IconButton size="small" color="primary" onClick={() => onWater(editedPlant.id)} disabled={isProcessing}><Droplet size={20} /></IconButton></Tooltip>
+              <Tooltip title="Snooze 1 Day"><IconButton size="small" color="info" onClick={() => onSnooze(editedPlant.id)} disabled={isProcessing}><AlarmClock size={20} /></IconButton></Tooltip>
+              <Tooltip title="Propagate"><IconButton size="small" color="secondary" onClick={() => onPropagate(editedPlant.id)} disabled={isProcessing}><Scissors size={20} /></IconButton></Tooltip>
+              <IconButton color="error" onClick={() => onDelete(editedPlant.id)}><Trash2 size={20} /></IconButton>
+            </>
+          )}
         </Box>
       </DialogTitle>
-      <DialogContent sx={{ minHeight: 500 }}>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }} variant="scrollable" scrollButtons="auto">
+
+      {isMobile && (
+        <Box sx={{ px: 3, py: 1, display: 'flex', justifyContent: 'space-around', borderBottom: '1px solid #eee' }}>
+          <IconButton color="primary" onClick={() => onWater(editedPlant.id)} disabled={isProcessing}><Droplet /></IconButton>
+          <IconButton color="info" onClick={() => onSnooze(editedPlant.id)} disabled={isProcessing}><AlarmClock /></IconButton>
+          <IconButton color="secondary" onClick={() => onPropagate(editedPlant.id)} disabled={isProcessing}><Scissors /></IconButton>
+          <IconButton sx={{ color: 'purple' }} onClick={handleIdentify} disabled={isProcessing || isIdentifying || !editedPlant.imagePath}><Brain /></IconButton>
+          <IconButton color="error" onClick={() => onDelete(editedPlant.id)}><Trash2 /></IconButton>
+        </Box>
+      )}
+
+      <DialogContent sx={{ minHeight: isMobile ? 0 : 500, p: isMobile ? 2 : 3 }}>
+        <Tabs
+          value={tab}
+          onChange={(_, v) => setTab(v)}
+          sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+        >
           <Tab label="General" icon={<Info size={16} />} iconPosition="start" />
           <Tab label="Plant Info" icon={<Sprout size={16} />} iconPosition="start" />
           <Tab label="History & Gallery" icon={<History size={16} />} iconPosition="start" />

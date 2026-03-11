@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Dialog, DialogTitle, DialogContent, DialogActions, TextField, 
-  Typography, Button, CircularProgress, Box, IconButton
+  Typography, Button, CircularProgress, Box, IconButton, useTheme, useMediaQuery
 } from '@mui/material';
 import { History, Camera as CameraIcon, X } from 'lucide-react';
 import { PlantUpdate } from '../../types';
@@ -25,6 +25,9 @@ const UpdateDialog: React.FC<UpdateDialogProps> = ({
   const [date, setDate] = useState(getLocalDateString());
   const [notes, setNotes] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   useEffect(() => {
     if (editingUpdate) {
@@ -41,11 +44,37 @@ const UpdateDialog: React.FC<UpdateDialogProps> = ({
     onSave({ date, notes }, selectedFile);
   };
 
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files.length > 0) {
+      setSelectedFile(event.target.files[0]);
+    }
+  };
+
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1, color: 'primary.main' }}>
-        <History color="inherit" />
-        {editingUpdate ? 'Edit History Entry' : 'Add Daily Growth Entry'}
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="xs"
+      fullScreen={isMobile}
+    >
+      <input
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        ref={fileInputRef}
+        onChange={handleFileChange}
+      />
+      <DialogTitle sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'primary.main' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <History color="inherit" />
+          {editingUpdate ? 'Edit History Entry' : 'Add Daily Growth Entry'}
+        </Box>
+        {isMobile && (
+          <IconButton onClick={onClose} size="small" edge="end">
+            <X size={24} />
+          </IconButton>
+        )}
       </DialogTitle>
       <DialogContent>
         {!editingUpdate && (
@@ -65,13 +94,7 @@ const UpdateDialog: React.FC<UpdateDialogProps> = ({
               variant="outlined" 
               size="small" 
               startIcon={<CameraIcon size={16} />} 
-              onClick={() => {
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = 'image/*';
-                input.onchange = (e: any) => setSelectedFile(e.target.files[0]);
-                input.click();
-              }}
+              onClick={() => fileInputRef.current?.click()}
             >
               Attach Photo
             </Button>

@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Dialog, DialogTitle, DialogContent, DialogActions, TextField, 
   Autocomplete, Box, Typography, IconButton, Button, Collapse,
-  Tooltip
+  Tooltip, useTheme, useMediaQuery
 } from '@mui/material';
 import { X, Sparkles, Camera as CameraIcon, HelpCircle, RotateCw } from 'lucide-react';
 import { Plant, PlantType } from '../../types';
@@ -36,6 +36,10 @@ const QuickAddDialog: React.FC<QuickAddDialogProps> = ({
   const [identifiedType, setIdentifiedType] = useState<string | null>(null);
   const [showCorrection, setShowCorrection] = useState(false);
   const [correctionName, setCorrectionName] = useState('');
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const handleAdd = () => {
     onAdd(newPlant, initialFile);
@@ -82,9 +86,35 @@ const QuickAddDialog: React.FC<QuickAddDialogProps> = ({
     onClose();
   };
 
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files.length > 0) {
+      setInitialFile(event.target.files[0]);
+    }
+  };
+
   return (
-    <Dialog open={open} onClose={resetAndClose} fullWidth maxWidth="xs">
-      <DialogTitle sx={{ color: 'primary.main', fontWeight: 'bold' }}>Quick Add Plant</DialogTitle>
+    <Dialog
+      open={open}
+      onClose={resetAndClose}
+      fullWidth
+      maxWidth="xs"
+      fullScreen={isMobile}
+    >
+      <input
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        ref={fileInputRef}
+        onChange={handleFileChange}
+      />
+      <DialogTitle sx={{ color: 'primary.main', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        Quick Add Plant
+        {isMobile && (
+          <IconButton onClick={resetAndClose} size="small" edge="end">
+            <X size={24} />
+          </IconButton>
+        )}
+      </DialogTitle>
       <DialogContent>
         <Box sx={{ mt: 1, mb: 3, p: 2, border: '1px dashed #ccc', borderRadius: 2, textAlign: 'center', bgcolor: '#fafafa' }}>
           {initialFile ? (
@@ -135,13 +165,7 @@ const QuickAddDialog: React.FC<QuickAddDialogProps> = ({
               variant="outlined" 
               size="small" 
               startIcon={<CameraIcon size={16} />} 
-              onClick={() => {
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = 'image/*';
-                input.onchange = (e: any) => setInitialFile(e.target.files[0]);
-                input.click();
-              }}
+              onClick={() => fileInputRef.current?.click()}
             >
               Attach Initial Photo
             </Button>
