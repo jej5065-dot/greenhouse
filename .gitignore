@@ -56,3 +56,5 @@ __pycache__/
 frontend_verification_*.png
 generate_icons.py
 verify_frontend.py
+/greenhouse.db-shm
+/greenhouse.db-wal

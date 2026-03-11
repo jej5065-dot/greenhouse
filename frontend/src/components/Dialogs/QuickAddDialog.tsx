@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Dialog, DialogTitle, DialogContent, DialogActions, TextField, 
   Autocomplete, Box, Typography, IconButton, Button, Collapse,
@@ -40,6 +40,21 @@ const QuickAddDialog: React.FC<QuickAddDialogProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+  useEffect(() => {
+    if (open) {
+      setNewPlant({ 
+        name: '', wateringFrequencyDays: 7, location: '',
+        goodForTerrariums: false, currentStage: 'Active',
+        plantStatus: 'Healthy'
+      });
+      setInitialFile(null);
+      setIdentifiedType(null);
+      setShowCorrection(false);
+      setCorrectionName('');
+      setIsIdentifying(false);
+    }
+  }, [open]);
 
   const handleAdd = () => {
     onAdd(newPlant, initialFile);
