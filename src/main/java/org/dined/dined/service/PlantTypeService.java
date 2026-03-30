@@ -15,6 +15,8 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import org.springframework.data.domain.Sort;
+
 @Service
 @lombok.extern.slf4j.Slf4j
 public class PlantTypeService {
@@ -26,7 +28,7 @@ public class PlantTypeService {
     private PlantService plantService;
 
     public List<PlantType> getAllTypes() {
-        return plantTypeRepository.findAll();
+        return plantTypeRepository.findAll(Sort.by(Sort.Direction.ASC, "name"));
     }
 
     public PlantType saveType(PlantType type) {
