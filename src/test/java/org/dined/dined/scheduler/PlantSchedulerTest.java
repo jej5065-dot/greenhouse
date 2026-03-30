@@ -135,4 +135,74 @@ class PlantSchedulerTest {
         // Assert
         verify(plantRepository, never()).save(any(Plant.class));
     }
+
+    @Test
+    void checkPlantStatus_ShouldProcessMultiplePlants_AndOnlyUpdateThoseThatNeedIt() {
+        // Arrange
+        Plant thirstyPlant = Plant.builder()
+                .id(1L)
+                .name("Thirsty Plant")
+                .nextWaterDate(LocalDate.now().minusDays(2))
+                .plantStatus("Healthy")
+                .build();
+
+        Plant happyPlant = Plant.builder()
+                .id(2L)
+                .name("Happy Plant")
+                .nextWaterDate(LocalDate.now().plusDays(3))
+                .plantStatus("Healthy")
+                .build();
+
+        Plant needsAttentionPlant = Plant.builder()
+                .id(3L)
+                .name("Needs Attention Plant")
+                .nextWaterDate(LocalDate.now().minusDays(1))
+                .plantStatus("Needs Attention")
+                .build();
+
+        Plant noWaterDatePlant = Plant.builder()
+                .id(4L)
+                .name("No Date Plant")
+                .nextWaterDate(null)
+                .plantStatus("Healthy")
+                .build();
+
+        when(plantRepository.findAll()).thenReturn(List.of(
+                thirstyPlant, happyPlant, needsAttentionPlant, noWaterDatePlant
+        ));
+
+        // Act
+        plantScheduler.checkPlantStatus();
+
+        // Assert
+        assertThat(thirstyPlant.getPlantStatus()).isEqualTo("Water Overdue");
+        assertThat(happyPlant.getPlantStatus()).isEqualTo("Healthy");
+        assertThat(needsAttentionPlant.getPlantStatus()).isEqualTo("Needs Attention");
+        assertThat(noWaterDatePlant.getPlantStatus()).isEqualTo("Healthy");
+
+        verify(plantRepository, times(1)).save(thirstyPlant);
+        verify(plantRepository, never()).save(happyPlant);
+        verify(plantRepository, never()).save(needsAttentionPlant);
+        verify(plantRepository, never()).save(noWaterDatePlant);
+    }
+
+    @Test
+    void checkPlantStatus_ShouldNotUpdateStatus_WhenPlantStatusIsNull() {
+        // Arrange
+        Plant nullStatusPlant = Plant.builder()
+                .id(6L)
+                .name("Null Status Plant")
+                .nextWaterDate(LocalDate.now().minusDays(1))
+                .plantStatus(null)
+                .build();
+
+        when(plantRepository.findAll()).thenReturn(List.of(nullStatusPlant));
+
+        // Act
+        plantScheduler.checkPlantStatus();
+
+        // Assert
+        assertThat(nullStatusPlant.getPlantStatus()).isNull();
+        verify(plantRepository, never()).save(any(Plant.class));
+    }
 }
