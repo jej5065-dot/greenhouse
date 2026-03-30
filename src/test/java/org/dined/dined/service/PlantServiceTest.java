@@ -9,10 +9,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -74,5 +78,64 @@ public class PlantServiceTest {
         assertEquals(0, summary.getReadyToSell());
         assertEquals(1, summary.getDistinctLocations()); // Only "Room"
         assertEquals(30.0, summary.getTotalEstimatedValue(), 0.001); // 10 + 20
+    }
+
+    @Test
+    public void testSearchPlants_NullOrEmptyTerm() {
+        Plant p1 = Plant.builder().build();
+        when(plantRepository.findAll()).thenReturn(Collections.singletonList(p1));
+
+        List<Plant> resultNull = plantService.searchPlants(null);
+        assertEquals(1, resultNull.size());
+
+        List<Plant> resultEmpty = plantService.searchPlants("   ");
+        assertEquals(1, resultEmpty.size());
+    }
+
+    @Test
+    public void testSearchPlants_NeedWatering() {
+        LocalDate today = LocalDate.now();
+        Plant p1 = Plant.builder().nextWaterDate(today.minusDays(1)).build(); // needs watering
+        Plant p2 = Plant.builder().nextWaterDate(today).build(); // needs watering
+        Plant p3 = Plant.builder().nextWaterDate(today.plusDays(1)).build(); // doesn't need watering
+        Plant p4 = Plant.builder().nextWaterDate(null).build(); // doesn't need watering
+
+        when(plantRepository.findAll()).thenReturn(Arrays.asList(p1, p2, p3, p4));
+
+        List<Plant> result = plantService.searchPlants("Need Watering");
+        assertEquals(2, result.size());
+        assertTrue(result.contains(p1));
+        assertTrue(result.contains(p2));
+    }
+
+    @Test
+    public void testSearchPlants_NumericIdMatch() {
+        Plant p1 = Plant.builder().id(123L).build();
+        when(plantRepository.findById(123L)).thenReturn(Optional.of(p1));
+
+        List<Plant> result = plantService.searchPlants("123");
+        assertEquals(1, result.size());
+        assertEquals(p1, result.get(0));
+    }
+
+    @Test
+    public void testSearchPlants_NumericIdNoMatch_FallbackToSearch() {
+        Plant p1 = Plant.builder().id(999L).build();
+        when(plantRepository.findById(123L)).thenReturn(Optional.empty());
+        when(plantRepository.search("123", 123L)).thenReturn(Collections.singletonList(p1));
+
+        List<Plant> result = plantService.searchPlants("123");
+        assertEquals(1, result.size());
+        assertEquals(p1, result.get(0));
+    }
+
+    @Test
+    public void testSearchPlants_TextTerm() {
+        Plant p1 = Plant.builder().name("Monstera").build();
+        when(plantRepository.search("Monstera", -1L)).thenReturn(Collections.singletonList(p1));
+
+        List<Plant> result = plantService.searchPlants("Monstera");
+        assertEquals(1, result.size());
+        assertEquals(p1, result.get(0));
     }
 }
